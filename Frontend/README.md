@@ -16,10 +16,10 @@ pnpm build
 - Shared responsive shell and UI primitives: [src/lib/components/README.md](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/components/README.md)
 - In-memory demo records: [src/lib/data/README.md](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/data/README.md)
 - Global visual tokens and responsive styles: [src/routes/layout.css](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/routes/layout.css)
-- Existing database foundation: [src/lib/server/db/schema.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/db/schema.ts)
+- Active Drizzle schema and relations: [src/lib/server/db/schema.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/db/schema.ts)
 
 To find shared role navigation logic visit [AppShell.svelte](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/components/AppShell.svelte).
 
 ## Tradeoffs
 
-Shared layout and data primitives keep the separate routes visually consistent without turning the screen library into a single-page application. Backend schema migration, authentication, uploads, wallet actions, and persistence remain deferred so the UI can be verified independently.
+Shared layout and data primitives keep the separate routes visually consistent without turning the screen library into a single-page application. Authentication, uploads, wallet actions, and persistence wiring remain deferred while the active domain schema now lives in the SvelteKit server directory.
