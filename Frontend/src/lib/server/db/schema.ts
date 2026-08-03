@@ -199,6 +199,7 @@ export const shipments = pgTable(
 			.notNull()
 			.references(() => users.id),
 		reference: text('reference').notNull(),
+		externalReference: text('external_reference'),
 		origin: text('origin').notNull(),
 		destination: text('destination').notNull(),
 		mode: text('mode').notNull(),
@@ -217,6 +218,7 @@ export const shipments = pgTable(
 	},
 	(table) => [
 		unique('workspace_shipment_reference_unique').on(table.workspaceId, table.reference),
+		unique('workspace_external_reference_unique').on(table.workspaceId, table.externalReference),
 		index('shipments_workspace_status_idx').on(table.workspaceId, table.status)
 	]
 );

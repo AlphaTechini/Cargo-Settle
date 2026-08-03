@@ -90,3 +90,29 @@ export const POST: RequestHandler = async (event) => {
 		return authErrorResponse(error);
 	}
 };
+
+export const GET: RequestHandler = async (event) => {
+	try {
+		const context = requireAccessRole(
+			await requireWorkspaceMember(event, event.params.workspaceId),
+			['owner', 'admin']
+		);
+		const db = getDb();
+		const invitations = await db
+			.select({
+				id: workspaceInvitations.id,
+				email: workspaceInvitations.email,
+				businessRole: workspaceInvitations.businessRole,
+				accessRole: workspaceInvitations.accessRole,
+				status: workspaceInvitations.status,
+				expiresAt: workspaceInvitations.expiresAt,
+				acceptedAt: workspaceInvitations.acceptedAt,
+				createdAt: workspaceInvitations.createdAt
+			})
+			.from(workspaceInvitations)
+			.where(eq(workspaceInvitations.workspaceId, context.workspace.id));
+		return json({ invitations });
+	} catch (error) {
+		return authErrorResponse(error);
+	}
+};

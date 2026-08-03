@@ -8,6 +8,9 @@ The frontend is a SvelteKit application using Svelte 5 runes, Tailwind CSS, Type
 pnpm dev
 pnpm check
 pnpm build
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
 ```
 
 ## Structure
@@ -23,3 +26,5 @@ To find shared role navigation logic visit [AppShell.svelte](file:///C:/Hackatho
 ## Tradeoffs
 
 Shared layout and data primitives keep the separate routes visually consistent without turning the screen library into a single-page application. Authentication, uploads, wallet actions, and persistence wiring remain deferred while the active domain schema now lives in the SvelteKit server directory.
+
+The Supabase migration is tracked in [drizzle/README.md](file:///C:/Hackathons/Cargo%20Settle/Frontend/drizzle/README.md). Local seed data is created by [scripts/seed.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/scripts/seed.ts) and requires `DATABASE_URL` plus `SEED_PASSWORD` in the local environment.
