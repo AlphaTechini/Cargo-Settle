@@ -1,17 +1,93 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { createShipment, getWorkspaceMembers, type WorkspaceMember } from '$lib/shipments';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
 	let step = $state(1);
 	let saved = $state(false);
+	let submitting = $state(false);
+	let error = $state('');
 	let origin = $state('');
 	let destination = $state('');
-	let reference = $state('SHP-2089');
+	let reference = $state('');
+	let clientId = $state('');
+	let mode = $state('ocean');
+	let cargoDescription = $state('');
+	let estimatedDeparture = $state('');
+	let estimatedArrival = $state('');
+	let notes = $state('');
+	let members = $state<WorkspaceMember[]>([]);
+	let createdShipmentId = $state('');
+	let loadedWorkspaceId = $state('');
+	let workspaceId = $derived(page.data.activeWorkspace?.id ?? '');
+	let currentUserId = $derived(page.data.user?.id ?? '');
+	let shippers = $derived(members.filter((member) => member.businessRole === 'shipper'));
 	const steps = ['Shipment details', 'Partners', 'Funding'];
 
-	function continueStep() {
+	$effect(() => {
+		if (!workspaceId || workspaceId === loadedWorkspaceId) return;
+		loadedWorkspaceId = workspaceId;
+		void loadMembers();
+	});
+
+	async function loadMembers() {
+		try {
+			members = (await getWorkspaceMembers(workspaceId)).members;
+			clientId = members.find((member) => member.businessRole === 'shipper')?.userId ?? '';
+		} catch (requestError) {
+			error =
+				requestError instanceof Error ? requestError.message : 'Unable to load workspace members';
+		}
+	}
+
+	function validateDetails() {
+		if (!workspaceId || !currentUserId)
+			return 'Sign in and select a workspace before creating a shipment.';
+		if (!clientId) return 'Select a shipper client.';
+		if (!origin.trim() || !destination.trim()) return 'Origin and destination are required.';
+		return '';
+	}
+
+	async function submitShipment() {
+		if (saved) return;
+		error = validateDetails();
+		if (error) return;
+		submitting = true;
+		try {
+			const result = await createShipment({
+				workspaceId,
+				shipperId: clientId,
+				freightForwarderId: currentUserId,
+				origin,
+				destination,
+				mode,
+				cargoDescription: cargoDescription || null,
+				externalReference: reference || null,
+				estimatedDeparture: estimatedDeparture || null,
+				estimatedArrival: estimatedArrival || null,
+				notes: notes || null,
+				milestones: [
+					{ key: 'departure', label: 'Departure', sequence: 1 },
+					{ key: 'delivery', label: 'Final delivery', sequence: 2, evidenceRequired: true }
+				]
+			});
+			createdShipmentId = result.shipment.id;
+			saved = true;
+		} catch (requestError) {
+			error = requestError instanceof Error ? requestError.message : 'Unable to create shipment';
+		} finally {
+			submitting = false;
+		}
+	}
+
+	async function continueStep() {
+		if (step === 1) {
+			error = validateDetails();
+			if (error) return;
+		}
 		if (step < 3) step += 1;
-		else saved = true;
+		else await submitShipment();
 	}
 </script>
 
@@ -19,7 +95,8 @@
 	<section class="mx-auto max-w-[1600px] p-5 lg:p-8">
 		<div class="mx-auto max-w-5xl">
 			<div class="mb-8 flex items-center justify-between gap-2">
-				{#each steps as label, index (label)}<div class="flex min-w-0 items-center gap-2">
+				{#each steps as label, index (label)}
+					<div class="flex min-w-0 items-center gap-2">
 						<span
 							class={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${step >= index + 1 ? 'bg-teal-700 text-white' : 'bg-slate-200 text-slate-600'}`}
 							>{index + 1}</span
@@ -35,12 +112,12 @@
 							</p>
 						</div>
 					</div>
-					{#if index < steps.length - 1}<div
-							class="mx-2 h-px flex-1 bg-slate-200"
-						></div>{/if}{/each}
+					{#if index < steps.length - 1}<div class="mx-2 h-px flex-1 bg-slate-200"></div>{/if}
+				{/each}
 			</div>
 			<div class="cs-card p-6">
-				{#if step === 1}<h2 class="text-xl font-extrabold">Shipment details</h2>
+				{#if step === 1}
+					<h2 class="text-xl font-extrabold">Shipment details</h2>
 					<p class="cs-muted mt-1 text-sm">
 						Create the commercial record that will hold milestones and payment obligations.
 					</p>
@@ -49,14 +126,19 @@
 							<label class="cs-label" for="client">Shipper client</label><select
 								id="client"
 								class="cs-input"
-								><option>Atlas Home Imports</option><option>Pioneer Retail Group</option></select
+								bind:value={clientId}
+								><option value="">Select a workspace member</option
+								>{#each shippers as shipper (shipper.userId)}<option value={shipper.userId}
+										>{shipper.displayName} · {shipper.email}</option
+									>{/each}</select
 							>
 						</div>
 						<div>
-							<label class="cs-label" for="reference">Internal shipment reference</label><input
+							<label class="cs-label" for="reference">External shipment reference</label><input
 								id="reference"
 								class="cs-input"
 								bind:value={reference}
+								placeholder="Customer or booking reference"
 							/>
 						</div>
 						<div>
@@ -76,16 +158,19 @@
 							/>
 						</div>
 						<div>
-							<label class="cs-label" for="mode">Mode</label><select id="mode" class="cs-input"
-								><option>Ocean freight</option><option>Air freight</option><option
-									>Road freight</option
-								></select
+							<label class="cs-label" for="mode">Mode</label><select
+								id="mode"
+								class="cs-input"
+								bind:value={mode}
+								><option value="ocean">Ocean freight</option><option value="air">Air freight</option
+								><option value="road">Road freight</option></select
 							>
 						</div>
 						<div>
 							<label class="cs-label" for="cargo">Cargo type</label><input
 								id="cargo"
 								class="cs-input"
+								bind:value={cargoDescription}
 								placeholder="Furniture and household goods"
 							/>
 						</div>
@@ -94,6 +179,7 @@
 								id="departure"
 								type="date"
 								class="cs-input"
+								bind:value={estimatedDeparture}
 							/>
 						</div>
 						<div>
@@ -101,90 +187,107 @@
 								id="arrival"
 								type="date"
 								class="cs-input"
+								bind:value={estimatedArrival}
 							/>
-						</div>
-						<div class="md:col-span-2">
-							<label class="cs-label" for="value">Shipment value</label>
-							<div class="grid grid-cols-[1fr_130px] gap-3">
-								<input id="value" class="cs-input" value="24,800" /><select class="cs-input"
-									><option>USDC</option><option>EURC</option></select
-								>
-							</div>
 						</div>
 						<div class="md:col-span-2">
 							<label class="cs-label" for="notes">Commercial notes</label><textarea
 								id="notes"
 								class="cs-input h-28"
+								bind:value={notes}
 								placeholder="Customer requirements, references, or operational context"></textarea>
 						</div>
-					</div>{:else if step === 2}<h2 class="text-xl font-extrabold">Assign partners</h2>
+					</div>
+				{:else if step === 2}
+					<h2 class="text-xl font-extrabold">Assign partners</h2>
 					<p class="cs-muted mt-1 text-sm">
-						Choose the service providers that will receive obligations on this shipment.
+						Milestones are created with the shipment. Partner assignments can be added after
+						creation.
 					</p>
 					<div class="mt-7 space-y-3">
-						<label class="cs-card-sm flex items-center gap-4 p-4"
-							><input type="checkbox" checked /><span
-								class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700"
+						<div class="cs-card-sm flex items-center gap-4 p-4">
+							<span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700"
 								><Icon name="ship" /></span
-							><span class="flex-1"
-								><b>Atlantic Ocean Lines</b><small class="cs-muted block text-xs"
-									>Ocean carrier · Cargo loaded</small
+							>
+							<span class="flex-1"
+								><b>Departure</b><small class="cs-muted block text-xs"
+									>Shipment milestone · Pending</small
 								></span
-							><span class="font-bold">$8,000</span></label
-						><label class="cs-card-sm flex items-center gap-4 p-4"
-							><input type="checkbox" checked /><span
+							>
+						</div>
+						<div class="cs-card-sm flex items-center gap-4 p-4">
+							<span
 								class="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-700"
 								><Icon name="building" /></span
-							><span class="flex-1"
-								><b>Rotterdam Port Services</b><small class="cs-muted block text-xs"
-									>Port agent · Customs cleared</small
+							>
+							<span class="flex-1"
+								><b>Final delivery</b><small class="cs-muted block text-xs"
+									>Evidence required · Pending</small
 								></span
-							><span class="font-bold">EURC 8,500</span></label
-						><label class="cs-card-sm flex items-center gap-4 p-4"
-							><input type="checkbox" /><span
-								class="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-700"
-								><Icon name="truck" /></span
-							><span class="flex-1"
-								><b>Metro Logistics</b><small class="cs-muted block text-xs"
-									>Trucking · Final delivery</small
-								></span
-							><span class="font-bold">$9,700</span></label
-						>
+							>
+						</div>
 					</div>
 					<a class="mt-5 inline-flex font-bold text-teal-700" href="/forwarder-partner-directory"
 						>Browse partner network <Icon name="arrow-right" size={16} /></a
-					>{:else}<h2 class="text-xl font-extrabold">Review and fund</h2>
+					>
+				{:else}
+					<h2 class="text-xl font-extrabold">Review and create</h2>
 					<p class="cs-muted mt-1 text-sm">
-						Confirm the shipment record before creating the demo workflow.
+						Confirm the shipment record before creating it in the active workspace.
 					</p>
 					<div class="mt-7 grid gap-4 md:grid-cols-3">
 						<div class="rounded-xl bg-slate-50 p-4">
-							<p class="cs-muted text-xs">Reference</p>
-							<p class="mt-1 font-extrabold">{reference}</p>
+							<p class="cs-muted text-xs">External reference</p>
+							<p class="mt-1 font-extrabold">{reference || 'Generated by CargoSettle'}</p>
 						</div>
 						<div class="rounded-xl bg-slate-50 p-4">
 							<p class="cs-muted text-xs">Route</p>
-							<p class="mt-1 font-extrabold">
-								{origin || 'New York'} -> {destination || 'Rotterdam'}
-							</p>
+							<p class="mt-1 font-extrabold">{origin} -> {destination}</p>
 						</div>
 						<div class="rounded-xl bg-slate-50 p-4">
-							<p class="cs-muted text-xs">Shipment value</p>
-							<p class="mt-1 font-extrabold">$24,800 USDC</p>
+							<p class="cs-muted text-xs">Funding setup</p>
+							<p class="mt-1 font-extrabold">After creation</p>
 						</div>
 					</div>
-					{#if saved}<div class="mt-5 rounded-xl bg-teal-50 p-4 text-sm text-teal-900">
-							Shipment created for this page session. Persistence will be wired in the backend pass.
-						</div>{/if}{/if}
+					{#if saved}
+						<div class="mt-5 rounded-xl bg-teal-50 p-4 text-sm text-teal-900">
+							<b>Shipment {reference || 'record'} created.</b>
+							<p class="mt-1">
+								The record and its milestones are now stored in the active workspace.
+							</p>
+							{#if createdShipmentId}<a
+									class="mt-3 inline-flex font-bold text-teal-800 underline"
+									href={`/forwarder-shipment-detail?id=${createdShipmentId}`}
+									>Open shipment detail</a
+								>{/if}
+						</div>
+					{/if}
+				{/if}
+				{#if error}<div class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-900">
+						{error}
+					</div>{/if}
 				<div class="cs-divider mt-8 flex justify-between border-t pt-5">
-					<button class="cs-btn cs-btn-secondary" disabled={step === 1} onclick={() => (step -= 1)}
-						>Back</button
+					<button
+						class="cs-btn cs-btn-secondary"
+						disabled={step === 1 || submitting}
+						onclick={() => (step -= 1)}>Back</button
 					>
 					<div class="flex gap-2">
-						<button class="cs-btn cs-btn-secondary" onclick={() => (saved = true)}
-							>Save draft</button
-						><button class="cs-btn cs-btn-primary" onclick={continueStep}
-							>{step === 3 ? 'Create shipment' : 'Continue'}
+						<button
+							class="cs-btn cs-btn-secondary"
+							disabled={submitting || saved}
+							onclick={submitShipment}>{submitting ? 'Saving...' : 'Save draft'}</button
+						><button
+							class="cs-btn cs-btn-primary"
+							disabled={submitting || (step === 3 && saved)}
+							onclick={continueStep}
+							>{submitting
+								? 'Creating...'
+								: step === 3
+									? saved
+										? 'Created'
+										: 'Create shipment'
+									: 'Continue'}
 							<Icon name="arrow-right" size={16} /></button
 						>
 					</div>

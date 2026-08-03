@@ -80,6 +80,8 @@ export async function listShipments(filters: ShipmentListFilters) {
 			status: shipments.status,
 			shipperId: shipments.shipperId,
 			freightForwarderId: shipments.freightForwarderId,
+			fundedAmount: shipments.fundedAmount,
+			fundedCurrency: shipments.fundedCurrency,
 			createdAt: shipments.createdAt,
 			updatedAt: shipments.updatedAt
 		})
