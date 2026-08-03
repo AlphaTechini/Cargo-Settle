@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { getDb } from '$lib/server/db';
 import { users, workspaceMembers, workspaces } from '$lib/server/db/schema';
 import { hashPassword, verifyPassword } from './password';
-import { createSession } from './sessions';
+import { createSession, SESSION_TTL_SHORT_SECONDS } from './sessions';
 import type { BusinessRole } from './types';
 
 export class AuthServiceError extends Error {
@@ -19,7 +20,7 @@ function workspaceSlug(name: string) {
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-|-$/g, '');
-	return `${normalized || 'workspace'}-${crypto.randomUUID().slice(0, 8)}`;
+	return `${normalized || 'workspace'}-${randomUUID().slice(0, 8)}`;
 }
 
 export async function registerUser(input: {
@@ -65,7 +66,7 @@ export async function registerUser(input: {
 	return { ...created, session };
 }
 
-export async function loginUser(input: { email: string; password: string }) {
+export async function loginUser(input: { email: string; password: string; rememberMe: boolean }) {
 	const db = getDb();
 	const [user] = await db
 		.select({
@@ -82,9 +83,18 @@ export async function loginUser(input: { email: string; password: string }) {
 		throw new AuthServiceError('Invalid email or password', 401);
 	}
 
-	const session = await createSession(user.id);
+	const [membership] = await db
+		.select({ businessRole: workspaceMembers.businessRole })
+		.from(workspaceMembers)
+		.where(eq(workspaceMembers.userId, user.id))
+		.limit(1);
+	const session = await createSession(
+		user.id,
+		input.rememberMe ? undefined : SESSION_TTL_SHORT_SECONDS
+	);
 	return {
 		user: { id: user.id, email: user.email, displayName: user.displayName },
+		businessRole: membership?.businessRole ?? null,
 		session
 	};
 }

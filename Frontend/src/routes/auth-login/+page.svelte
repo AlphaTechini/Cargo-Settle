@@ -1,17 +1,43 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 
 	let email = $state('amara@northstarfreight.com');
-	let password = $state('password');
+	let password = $state('');
 	let keepSignedIn = $state(true);
-	let message = $state('');
+	let error = $state('');
+	let loading = $state(false);
 
-	function signIn() {
-		message =
-			email && password
-				? 'Demo sign-in complete. Opening your workspace.'
-				: 'Enter your email and password to continue.';
+	async function signIn() {
+		error = '';
+		loading = true;
+		try {
+			const response = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ email, password, rememberMe: keepSignedIn })
+			});
+			const result = (await response.json()) as {
+				error?: string;
+				businessRole?: 'shipper' | 'freight_forwarder' | 'logistics_partner' | null;
+			};
+			if (!response.ok) {
+				error = result.error ?? 'Unable to sign in';
+				return;
+			}
+			await goto(
+				result.businessRole === 'shipper'
+					? '/shipper-dashboard'
+					: result.businessRole === 'logistics_partner'
+						? '/partner-dashboard'
+						: '/forwarder-dashboard'
+			);
+		} catch {
+			error = 'The authentication service is unavailable';
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -37,6 +63,7 @@
 						id="email"
 						class="cs-input"
 						type="email"
+						autocomplete="email"
 						bind:value={email}
 					/>
 				</div>
@@ -47,22 +74,22 @@
 							href="/auth-login">Forgot password?</a
 						>
 					</div>
-					<input id="password" class="cs-input" type="password" bind:value={password} />
+					<input
+						id="password"
+						class="cs-input"
+						type="password"
+						autocomplete="current-password"
+						bind:value={password}
+					/>
 				</div>
 				<label class="cs-muted flex items-center gap-2 text-sm"
 					><input type="checkbox" bind:checked={keepSignedIn} class="accent-teal-700" />Keep me
 					signed in</label
-				><button type="submit" class="cs-btn cs-btn-primary w-full !py-3"
-					>Sign in <Icon name="arrow-right" size={16} /></button
+				><button type="submit" class="cs-btn cs-btn-primary w-full !py-3" disabled={loading}
+					>{loading ? 'Signing in...' : 'Sign in'} <Icon name="arrow-right" size={16} /></button
 				>
 			</form>
-			{#if message}<div class="cs-card mt-4 p-4 text-sm">
-					<p class="font-bold">{message}</p>
-					{#if email && password}<a
-							class="mt-2 inline-block font-bold text-teal-700"
-							href="/forwarder-dashboard">Open forwarder workspace</a
-						>{/if}
-				</div>{/if}
+			{#if error}<div class="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-900">{error}</div>{/if}
 			<p class="cs-muted mt-7 text-center text-sm">
 				New to CargoSettle? <a class="font-bold text-teal-700" href="/auth-register"
 					>Create an account</a

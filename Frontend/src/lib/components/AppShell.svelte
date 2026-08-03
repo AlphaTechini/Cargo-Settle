@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import Logo from './Logo.svelte';
@@ -17,6 +19,7 @@
 	let searchOpen = $state(false);
 	let notificationsOpen = $state(false);
 	let workspaceOpen = $state(false);
+	let profileOpen = $state(false);
 
 	const roleDetails = {
 		forwarder: {
@@ -63,6 +66,15 @@
 	} as const;
 
 	let details = $derived(roleDetails[role as Role]);
+	let currentUser = $derived(page.data.user);
+	let activeWorkspace = $derived(page.data.workspaces?.[0]);
+	let workspaceName = $derived(activeWorkspace?.name ?? details.workspace);
+	let profileName = $derived(currentUser?.displayName ?? details.person);
+
+	async function logout() {
+		await fetch('/api/auth/logout', { method: 'POST' });
+		await goto('/auth-login');
+	}
 </script>
 
 <svelte:head>
@@ -83,7 +95,7 @@
 				<span
 					><span class="cs-muted block text-[.68rem] font-bold tracking-wider uppercase"
 						>{details.workspaceLabel}</span
-					><span class="mt-1 block text-sm font-bold">{details.workspace}</span></span
+					><span class="mt-1 block text-sm font-bold">{workspaceName}</span></span
 				>
 				<Icon name="chevrons-up-down" size={16} className="cs-muted" />
 			</button>
@@ -116,19 +128,25 @@
 				>
 			</div>
 		{/if}
-		<div class="cs-card-sm mt-auto flex items-center gap-3 p-3">
+		<div class="cs-card-sm relative mt-auto flex items-center gap-3 p-3">
 			<div class="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-sm font-extrabold">
 				{details.initials}
 			</div>
 			<div class="min-w-0">
-				<p class="truncate text-sm font-bold">{details.person}</p>
+				<p class="truncate text-sm font-bold">{profileName}</p>
 				<p class="cs-muted truncate text-xs">{details.label}</p>
 			</div>
 			<button
 				class="cs-muted ml-auto rounded-md p-1"
 				aria-label="Open profile menu"
-				onclick={() => (workspaceOpen = !workspaceOpen)}><Icon name="more" size={18} /></button
+				onclick={() => (profileOpen = !profileOpen)}><Icon name="more" size={18} /></button
 			>
+			{#if profileOpen}
+				<div class="cs-card cs-shadow absolute right-0 bottom-full z-40 mb-2 w-56 p-3">
+					{#if currentUser}<p class="cs-muted truncate text-xs">{currentUser.email}</p>{/if}
+					<button class="cs-btn cs-btn-secondary mt-3 w-full" onclick={logout}>Sign out</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 </aside>
@@ -145,9 +163,7 @@
 				>
 				<div class="min-w-0">
 					<div class="cs-muted mb-1 hidden items-center gap-2 text-xs sm:flex">
-						<span>{details.workspace}</span><Icon name="chevron-right" size={13} /><span
-							>{title}</span
-						>
+						<span>{workspaceName}</span><Icon name="chevron-right" size={13} /><span>{title}</span>
 					</div>
 					<h1 class="truncate text-[1.2rem] font-extrabold tracking-tight lg:text-[1.35rem]">
 						{title}

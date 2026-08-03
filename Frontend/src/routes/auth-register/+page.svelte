@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 
@@ -29,20 +30,55 @@
 	let selectedRole = $state('forwarder');
 	let fullName = $state('');
 	let email = $state('');
+	let password = $state('');
 	let company = $state('');
 	let region = $state('Global');
-	let message = $state('');
+	let error = $state('');
+	let loading = $state(false);
 	const roleToneClasses: Record<string, string> = {
 		teal: 'bg-teal-50 text-teal-700',
 		blue: 'bg-blue-50 text-blue-700',
 		amber: 'bg-amber-50 text-amber-700'
 	};
 
-	function createWorkspace() {
-		message =
-			fullName && email && company
-				? 'Workspace created.'
-				: 'Complete your name, work email, and company to continue.';
+	const roleValues = {
+		forwarder: 'freight_forwarder',
+		shipper: 'shipper',
+		partner: 'logistics_partner'
+	} as const;
+
+	async function createWorkspace() {
+		error = '';
+		loading = true;
+		try {
+			const response = await fetch('/api/auth/register', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					displayName: fullName,
+					email,
+					password,
+					workspaceName: company,
+					businessRole: roleValues[selectedRole as keyof typeof roleValues]
+				})
+			});
+			const result = (await response.json()) as { error?: string };
+			if (!response.ok) {
+				error = result.error ?? 'Unable to create your workspace';
+				return;
+			}
+			await goto(
+				selectedRole === 'forwarder'
+					? '/forwarder-dashboard'
+					: selectedRole === 'partner'
+						? '/partner-dashboard'
+						: '/shipper-dashboard'
+			);
+		} catch {
+			error = 'The authentication service is unavailable';
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -99,8 +135,19 @@
 				id="work-email"
 				class="cs-input"
 				type="email"
+				autocomplete="email"
 				bind:value={email}
 				placeholder="amara@company.com"
+			/>
+		</div>
+		<div>
+			<label class="cs-label" for="password">Password</label><input
+				id="password"
+				class="cs-input"
+				type="password"
+				autocomplete="new-password"
+				bind:value={password}
+				placeholder="At least 8 characters"
 			/>
 		</div>
 		<div>
@@ -127,19 +174,13 @@
 					>{roles.find((role) => role.id === selectedRole)?.label}</span
 				>
 			</p>
-			<button type="submit" class="cs-btn cs-btn-primary"
-				>Create workspace <Icon name="arrow-right" size={16} /></button
+			<button type="submit" class="cs-btn cs-btn-primary" disabled={loading}
+				>{loading ? 'Creating...' : 'Create workspace'}
+				<Icon name="arrow-right" size={16} /></button
 			>
 		</div>
-		{#if message}<div class="rounded-xl bg-teal-50 p-4 text-sm text-teal-900 md:col-span-2">
-				{message}{#if fullName && email && company}<a
-						href={selectedRole === 'forwarder'
-							? '/forwarder-dashboard'
-							: selectedRole === 'partner'
-								? '/partner-dashboard'
-								: '/shipper-dashboard'}
-						class="ml-2 font-bold text-teal-700">Continue</a
-					>{/if}
+		{#if error}<div class="rounded-xl bg-red-50 p-4 text-sm text-red-900 md:col-span-2">
+				{error}
 			</div>{/if}
 	</form>
 </main>

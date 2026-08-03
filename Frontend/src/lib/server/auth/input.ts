@@ -17,6 +17,7 @@ export type RegistrationInput = {
 export type LoginInput = {
 	email: string;
 	password: string;
+	rememberMe: boolean;
 };
 
 function stringField(value: unknown, field: string) {
@@ -51,6 +52,7 @@ export function parseLoginInput(value: unknown): LoginInput {
 	const body = value as Record<string, unknown>;
 	return {
 		email: stringField(body.email, 'email').toLowerCase(),
-		password: stringField(body.password, 'password')
+		password: stringField(body.password, 'password'),
+		rememberMe: body.rememberMe !== false
 	};
 }
