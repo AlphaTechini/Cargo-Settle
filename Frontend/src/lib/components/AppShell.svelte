@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
@@ -67,13 +67,25 @@
 
 	let details = $derived(roleDetails[role as Role]);
 	let currentUser = $derived(page.data.user);
-	let activeWorkspace = $derived(page.data.workspaces?.[0]);
+	let activeWorkspace = $derived(page.data.activeWorkspace);
 	let workspaceName = $derived(activeWorkspace?.name ?? details.workspace);
 	let profileName = $derived(currentUser?.displayName ?? details.person);
 
 	async function logout() {
 		await fetch('/api/auth/logout', { method: 'POST' });
 		await goto('/auth-login');
+	}
+
+	async function selectWorkspace(workspaceId: string) {
+		const response = await fetch('/api/session/workspace', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ workspaceId })
+		});
+		if (response.ok) {
+			workspaceOpen = false;
+			await invalidateAll();
+		}
 	}
 </script>
 
@@ -101,13 +113,16 @@
 			</button>
 			{#if workspaceOpen}
 				<div class="cs-card cs-shadow absolute top-full right-2 left-2 z-40 mt-2 p-2 text-sm">
-					<button
-						class="w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50"
-						onclick={() => (workspaceOpen = false)}>Demo workspace</button
-					>
-					<button
-						class="w-full rounded-lg px-3 py-2 text-left text-teal-700 hover:bg-slate-50"
-						onclick={() => (workspaceOpen = false)}>Manage workspace</button
+					{#each page.data.workspaces ?? [] as workspace (workspace.id)}
+						<button
+							class={`w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${workspace.id === activeWorkspace?.id ? 'bg-teal-50 font-bold text-teal-700' : ''}`}
+							onclick={() => selectWorkspace(workspace.id)}>{workspace.name}</button
+						>
+					{/each}
+					<a
+						href="/settings"
+						class="mt-1 block rounded-lg px-3 py-2 text-teal-700 hover:bg-slate-50"
+						>Manage workspace</a
 					>
 				</div>
 			{/if}
