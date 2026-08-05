@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+Frontend/.svelte-kit/
+Frontend/build/
+
+Contracts/lib/
+Contracts/cache/
+Contracts/out/
+Contracts/broadcast/
