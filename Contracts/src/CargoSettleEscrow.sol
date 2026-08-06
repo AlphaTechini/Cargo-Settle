@@ -12,7 +12,6 @@ import {ICargoSettleEscrow} from "./interfaces/ICargoSettleEscrow.sol";
 contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSettleEscrow {
     using SafeERC20 for IERC20;
 
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
 
     error InvalidAddress();
@@ -22,7 +21,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
     error ShipmentIsCancelled(bytes32 shipmentId);
     error ShipmentAlreadyCompleted(bytes32 shipmentId);
     error NotShipmentParty(bytes32 shipmentId, address caller);
-    error UnauthorizedShipmentOperator(bytes32 shipmentId, address caller);
+    error NotForwarder(bytes32 shipmentId, address caller);
     error MilestoneExists(bytes32 shipmentId, bytes32 milestoneId);
     error MilestoneNotFound(bytes32 shipmentId, bytes32 milestoneId);
     error MilestoneIncomplete(bytes32 shipmentId, bytes32 milestoneId);
@@ -97,12 +96,10 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         bytes32 indexed shipmentId, address indexed recipient, address indexed token, uint256 amount
     );
 
-    constructor(address admin, address operator, address usdc, address eurc) {
-        if (admin == address(0) || operator == address(0) || usdc == address(0)) revert InvalidAddress();
+    constructor(address admin, address usdc, address eurc) {
+        if (admin == address(0) || usdc == address(0)) revert InvalidAddress();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(OPERATOR_ROLE, operator);
-        _grantRole(SETTLEMENT_ROLE, operator);
 
         allowedTokens[usdc] = true;
         emit TokenAllowlistUpdated(usdc, true);
@@ -119,13 +116,10 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         emit TokenAllowlistUpdated(token, allowed);
     }
 
-    function createShipment(bytes32 shipmentId, address shipper, address forwarder)
-        external
-        onlyRole(OPERATOR_ROLE)
-        whenNotPaused
-    {
+    function createShipment(bytes32 shipmentId, address shipper, address forwarder) external whenNotPaused {
         if (shipmentId == bytes32(0)) revert InvalidId();
         if (shipper == address(0) || forwarder == address(0)) revert InvalidAddress();
+        if (msg.sender != forwarder) revert NotForwarder(shipmentId, msg.sender);
         if (_shipments[shipmentId].exists) revert ShipmentExists(shipmentId);
 
         _shipments[shipmentId] = Shipment({
@@ -141,7 +135,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         emit ShipmentCreated(shipmentId, shipper, forwarder);
     }
 
-    function createMilestone(bytes32 shipmentId, bytes32 milestoneId) external onlyRole(OPERATOR_ROLE) whenNotPaused {
+    function createMilestone(bytes32 shipmentId, bytes32 milestoneId) external onlyForwarder(shipmentId) whenNotPaused {
         _requireActiveShipment(shipmentId);
         if (milestoneId == bytes32(0)) revert InvalidId();
         if (_milestones[shipmentId][milestoneId].exists) revert MilestoneExists(shipmentId, milestoneId);
@@ -161,7 +155,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         bytes32 milestoneId,
         uint64 dueAt,
         bool financingEligible
-    ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
+    ) external onlyForwarder(shipmentId) whenNotPaused {
         _requireActiveShipment(shipmentId);
         if (obligationId == bytes32(0) || recipient == address(0) || milestoneId == bytes32(0)) revert InvalidId();
         if (token == address(0) || !allowedTokens[token]) revert TokenNotAllowed(token);
@@ -201,7 +195,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
 
     function completeMilestone(bytes32 shipmentId, bytes32 milestoneId, bytes32 evidenceHash)
         external
-        onlyShipmentOperator(shipmentId)
+        onlyForwarder(shipmentId)
         whenNotPaused
     {
         Shipment storage shipment = _shipments[shipmentId];
@@ -241,7 +235,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         return _releaseObligation(obligationId, recipient);
     }
 
-    function completeShipment(bytes32 shipmentId) external onlyShipmentOperator(shipmentId) whenNotPaused {
+    function completeShipment(bytes32 shipmentId) external onlyForwarder(shipmentId) whenNotPaused {
         Shipment storage shipment = _shipments[shipmentId];
         if (shipment.cancelled) revert ShipmentIsCancelled(shipmentId);
         if (shipment.outstandingObligations != 0) {
@@ -253,7 +247,7 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         emit ShipmentCompleted(shipmentId);
     }
 
-    function cancelShipment(bytes32 shipmentId) external onlyShipmentOperator(shipmentId) whenNotPaused {
+    function cancelShipment(bytes32 shipmentId) external onlyForwarder(shipmentId) whenNotPaused {
         Shipment storage shipment = _shipments[shipmentId];
         if (shipment.completed) revert ShipmentAlreadyCompleted(shipmentId);
         if (shipment.cancelled) revert ShipmentIsCancelled(shipmentId);
@@ -365,11 +359,9 @@ contract CargoSettleEscrow is AccessControl, Pausable, ReentrancyGuard, ICargoSe
         if (shipment.completed) revert ShipmentAlreadyCompleted(shipmentId);
     }
 
-    modifier onlyShipmentOperator(bytes32 shipmentId) {
+    modifier onlyForwarder(bytes32 shipmentId) {
         Shipment storage shipment = _requireShipment(shipmentId);
-        if (msg.sender != shipment.forwarder && !hasRole(OPERATOR_ROLE, msg.sender)) {
-            revert UnauthorizedShipmentOperator(shipmentId, msg.sender);
-        }
+        if (msg.sender != shipment.forwarder) revert NotForwarder(shipmentId, msg.sender);
         _;
     }
 }

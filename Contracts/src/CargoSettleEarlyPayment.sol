@@ -12,7 +12,6 @@ import {ICargoSettleEscrow} from "./interfaces/ICargoSettleEscrow.sol";
 contract CargoSettleEarlyPayment is AccessControl, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant FINANCIER_ROLE = keccak256("FINANCIER_ROLE");
 
     error InvalidAddress();
@@ -58,12 +57,11 @@ contract CargoSettleEarlyPayment is AccessControl, Pausable, ReentrancyGuard {
     event EarlyPaymentSettled(bytes32 indexed requestId, address indexed financier, uint256 repaymentAmount);
     event EarlyPaymentCancelled(bytes32 indexed requestId, address indexed financier, uint256 refundAmount);
 
-    constructor(address admin, address operator, address escrowAddress) {
-        if (admin == address(0) || operator == address(0) || escrowAddress == address(0)) revert InvalidAddress();
+    constructor(address admin, address escrowAddress) {
+        if (admin == address(0) || escrowAddress == address(0)) revert InvalidAddress();
 
         escrow = ICargoSettleEscrow(escrowAddress);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(OPERATOR_ROLE, operator);
     }
 
     function grantFinancier(address financier) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -153,9 +151,7 @@ contract CargoSettleEarlyPayment is AccessControl, Pausable, ReentrancyGuard {
 
     function settleRequest(bytes32 requestId) external whenNotPaused nonReentrant {
         EarlyPaymentRequest storage request = _requireRequest(requestId);
-        if (msg.sender != request.financier && !hasRole(OPERATOR_ROLE, msg.sender)) {
-            revert NotRequestParty(requestId, msg.sender);
-        }
+        if (msg.sender != request.financier) revert NotRequestParty(requestId, msg.sender);
         if (!request.funded || !request.advanceClaimed || request.settled || request.cancelled) {
             revert InvalidRequestState(requestId);
         }
@@ -173,9 +169,7 @@ contract CargoSettleEarlyPayment is AccessControl, Pausable, ReentrancyGuard {
 
     function cancelRequest(bytes32 requestId) external whenNotPaused nonReentrant {
         EarlyPaymentRequest storage request = _requireRequest(requestId);
-        if (msg.sender != request.financier && !hasRole(OPERATOR_ROLE, msg.sender)) {
-            revert NotRequestParty(requestId, msg.sender);
-        }
+        if (msg.sender != request.financier) revert NotRequestParty(requestId, msg.sender);
         if (request.advanceClaimed || request.settled || request.cancelled) revert InvalidRequestState(requestId);
 
         request.cancelled = true;

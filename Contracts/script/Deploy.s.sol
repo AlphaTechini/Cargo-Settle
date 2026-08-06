@@ -10,7 +10,6 @@ contract Deploy is Script {
     function run() external returns (CargoSettleEscrow escrow, CargoSettleEarlyPayment earlyPayment) {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.envAddress("ADMIN_ADDRESS");
-        address operator = vm.envAddress("OPERATOR_ADDRESS");
         address usdc = vm.envAddress("USDC_ADDRESS");
         address eurc = vm.envAddress("EURC_ADDRESS");
 
@@ -18,8 +17,8 @@ contract Deploy is Script {
 
         vm.startBroadcast(privateKey);
 
-        escrow = new CargoSettleEscrow(admin, operator, usdc, eurc);
-        earlyPayment = new CargoSettleEarlyPayment(admin, operator, address(escrow));
+        escrow = new CargoSettleEscrow(admin, usdc, eurc);
+        earlyPayment = new CargoSettleEarlyPayment(admin, address(escrow));
         escrow.grantRole(escrow.SETTLEMENT_ROLE(), address(earlyPayment));
 
         vm.stopBroadcast();

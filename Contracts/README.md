@@ -4,10 +4,10 @@ This directory contains the custom settlement contracts for CargoSettle. The con
 
 ## Architecture
 
-- `CargoSettleEscrow` stores shipment financial state, accepts stablecoin funding, creates obligations, gates releases on milestones, supports batch settlement, and refunds cancelled or completed shipments.
-- `CargoSettleEarlyPayment` advances an eligible obligation to a logistics partner and routes the later escrow payout to the financier before distributing any remainder.
+- `CargoSettleEscrow` stores shipment financial state, accepts stablecoin funding, gates releases on milestones, supports batch settlement, and refunds cancelled or completed shipments. Shipment business actions are signed by the stored shipper or forwarder wallets.
+- `CargoSettleEarlyPayment` advances an eligible obligation to a logistics partner and routes the later escrow payout to the financier before distributing any remainder. The partner and financier sign their own actions.
 - OpenZeppelin Contracts provides access control, pausing, reentrancy protection, and safe ERC-20 transfers.
-- Shipment metadata, documents, evidence files, users, workspace permissions, and audit projections remain in Supabase. The chain stores identifiers, wallet addresses, token amounts, statuses, timestamps, and evidence hashes.
+- Shipment metadata, documents, evidence files, users, workspace permissions, and audit projections remain in Supabase. The chain stores identifiers, wallet addresses, token amounts, statuses, timestamps, and evidence hashes. The admin wallet is limited to token allowlisting, pausing, and role administration.
 
 To find escrow accounting and milestone release logic visit [CargoSettleEscrow.sol](file:///C:/Hackathons/Cargo%20Settle/Contracts/src/CargoSettleEscrow.sol).
 
@@ -38,7 +38,7 @@ forge build
 
 ## Deployment
 
-Copy `.env.example` to `.env` without committing the copy. Set `ADMIN_ADDRESS` to the address derived from `PRIVATE_KEY`, fill in the operator and token addresses, then run the deployment script from this directory:
+Copy `.env.example` to `.env` without committing the copy. Set `ADMIN_ADDRESS` to the address derived from `PRIVATE_KEY`, fill in the token addresses, then run the deployment script from this directory:
 
 ```sh
 forge script script/Deploy.s.sol:Deploy --rpc-url $ARC_TESTNET_RPC_URL --broadcast
@@ -48,7 +48,7 @@ The script deploys escrow and early payment contracts, then grants the escrow se
 
 ## Tradeoffs
 
-- A singleton escrow contract keeps all shipment settlement logic indexable and avoids deploying one contract per shipment. It increases the importance of role management and pause controls.
+- A singleton escrow contract keeps all shipment settlement logic indexable and avoids deploying one contract per shipment. Participant wallet checks provide business authorization, while the admin role is limited to protocol controls.
 - Early payment is isolated in a second contract so financing risk and repayment logic do not expand the core escrow surface.
 - The contract accepts explicit token addresses instead of embedding swap or bridge behavior. This keeps the accounting deterministic and lets App Kit or StableFX handle liquidity and FX outside the settlement contract.
 - No upgrade proxy is included in this first version. Immutable settlement logic reduces upgrade authority risk, while a future version can add a separately reviewed migration path if required.
