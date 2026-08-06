@@ -2,3 +2,8 @@ allowBuilds:
   '@tailwindcss/oxide': true
   argon2: true
   esbuild: true
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - viem@2.55.11
+overrides:
+  uuid: 11.1.1

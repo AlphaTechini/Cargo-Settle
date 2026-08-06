@@ -185,6 +185,46 @@ export const sessions = pgTable(
 	]
 );
 
+export const walletConnections = pgTable(
+	'wallet_connections',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id),
+		network: text('network').notNull(),
+		chainId: integer('chain_id').notNull(),
+		address: text('address').notNull(),
+		verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(table) => [
+		unique('wallet_connection_user_network_unique').on(table.userId, table.network),
+		unique('wallet_connection_network_address_unique').on(table.network, table.address),
+		index('wallet_connections_user_idx').on(table.userId)
+	]
+);
+
+export const walletLinkChallenges = pgTable(
+	'wallet_link_challenges',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id),
+		network: text('network').notNull(),
+		chainId: integer('chain_id').notNull(),
+		address: text('address').notNull(),
+		message: text('message').notNull(),
+		nonceHash: text('nonce_hash').notNull().unique(),
+		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+		consumedAt: timestamp('consumed_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(table) => [index('wallet_link_challenges_user_idx').on(table.userId)]
+);
+
 export const shipments = pgTable(
 	'shipments',
 	{
@@ -491,6 +531,8 @@ export const usersRelations = relations(users, ({ many }) => ({
 	memberships: many(workspaceMembers, { relationName: 'workspace_membership_user' }),
 	createdInvitations: many(workspaceInvitations, { relationName: 'invitation_creator' }),
 	sessions: many(sessions),
+	walletConnections: many(walletConnections),
+	walletLinkChallenges: many(walletLinkChallenges),
 	createdShipments: many(shipments, { relationName: 'shipment_creator' }),
 	shipperShipments: many(shipments, { relationName: 'shipment_shipper' }),
 	forwarderShipments: many(shipments, { relationName: 'shipment_forwarder' }),
@@ -556,6 +598,20 @@ export const workspaceInvitationsRelations = relations(workspaceInvitations, ({ 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
 	user: one(users, {
 		fields: [sessions.userId],
+		references: [users.id]
+	})
+}));
+
+export const walletConnectionsRelations = relations(walletConnections, ({ one }) => ({
+	user: one(users, {
+		fields: [walletConnections.userId],
+		references: [users.id]
+	})
+}));
+
+export const walletLinkChallengesRelations = relations(walletLinkChallenges, ({ one }) => ({
+	user: one(users, {
+		fields: [walletLinkChallenges.userId],
 		references: [users.id]
 	})
 }));

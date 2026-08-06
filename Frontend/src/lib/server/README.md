@@ -5,5 +5,6 @@ This directory contains SvelteKit-only backend logic. It is never imported by br
 - Authentication and session state: [auth/README.md](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/auth/README.md)
 - Workspace membership loading: [workspaces.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/workspaces.ts)
 - Database connection and schema: [db/README.md](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/db/README.md)
+- Wallet challenge and ownership verification: [wallets.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/wallets.ts)
 
 To find shared workspace session data visit [workspaces.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/workspaces.ts).

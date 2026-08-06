@@ -4,6 +4,7 @@
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import Logo from './Logo.svelte';
+	import WalletButton from './WalletButton.svelte';
 
 	type Role = 'forwarder' | 'partner' | 'shipper';
 
@@ -187,6 +188,7 @@
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
+				<WalletButton />
 				<button
 					class="cs-btn cs-btn-secondary !px-3"
 					aria-label="Toggle search"
