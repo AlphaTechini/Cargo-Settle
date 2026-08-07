@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '$lib/server/db';
 import { users, workspaceMembers, workspaces } from '$lib/server/db/schema';
@@ -84,9 +84,18 @@ export async function loginUser(input: { email: string; password: string; rememb
 	}
 
 	const [membership] = await db
-		.select({ businessRole: workspaceMembers.businessRole })
+		.select({
+			businessRole: workspaceMembers.businessRole,
+			workspace: {
+				id: workspaces.id,
+				name: workspaces.name,
+				slug: workspaces.slug
+			}
+		})
 		.from(workspaceMembers)
+		.innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
 		.where(eq(workspaceMembers.userId, user.id))
+		.orderBy(asc(workspaces.createdAt), asc(workspaceMembers.joinedAt))
 		.limit(1);
 	const session = await createSession(
 		user.id,
@@ -95,6 +104,7 @@ export async function loginUser(input: { email: string; password: string; rememb
 	return {
 		user: { id: user.id, email: user.email, displayName: user.displayName },
 		businessRole: membership?.businessRole ?? null,
+		workspace: membership?.workspace ?? null,
 		session
 	};
 }

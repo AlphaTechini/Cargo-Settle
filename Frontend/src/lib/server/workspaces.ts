@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { workspaceMembers, workspaces } from '$lib/server/db/schema';
 import type { AccessRole, BusinessRole } from './auth/types';
@@ -40,7 +40,8 @@ export async function listUserWorkspaces(userId: string) {
 		})
 		.from(workspaceMembers)
 		.innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
-		.where(eq(workspaceMembers.userId, userId));
+		.where(eq(workspaceMembers.userId, userId))
+		.orderBy(asc(workspaces.createdAt), asc(workspaceMembers.joinedAt));
 }
 
 export async function getUserWorkspace(userId: string, workspaceId: string) {

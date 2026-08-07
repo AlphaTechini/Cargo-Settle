@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { workspaceMembers, workspaces } from '$lib/server/db/schema';
@@ -35,12 +35,13 @@ export function requireUser(event: RequestEvent): AuthUser {
 
 export async function requireWorkspaceMember(event: RequestEvent, workspaceId?: string) {
 	const user = requireUser(event);
-	const selectedWorkspaceId = workspaceId ?? event.cookies.get('cargosettle_workspace');
+	const explicitWorkspaceId = workspaceId;
+	const selectedWorkspaceId = explicitWorkspaceId ?? event.cookies.get('cargosettle_workspace');
 	const db = getDb();
 	const filters = [eq(workspaceMembers.userId, user.id)];
 	if (selectedWorkspaceId) filters.push(eq(workspaceMembers.workspaceId, selectedWorkspaceId));
 
-	const [row] = await db
+	let [row] = await db
 		.select({
 			workspace: {
 				id: workspaces.id,
@@ -56,7 +57,29 @@ export async function requireWorkspaceMember(event: RequestEvent, workspaceId?: 
 		.from(workspaceMembers)
 		.innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
 		.where(and(...filters))
+		.orderBy(asc(workspaces.createdAt), asc(workspaceMembers.joinedAt))
 		.limit(1);
+
+	if (!row && !explicitWorkspaceId && selectedWorkspaceId) {
+		[row] = await db
+			.select({
+				workspace: {
+					id: workspaces.id,
+					name: workspaces.name,
+					slug: workspaces.slug
+				},
+				membership: {
+					id: workspaceMembers.id,
+					businessRole: workspaceMembers.businessRole,
+					accessRole: workspaceMembers.accessRole
+				}
+			})
+			.from(workspaceMembers)
+			.innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
+			.where(eq(workspaceMembers.userId, user.id))
+			.orderBy(asc(workspaces.createdAt), asc(workspaceMembers.joinedAt))
+			.limit(1);
+	}
 
 	if (!row) throw new AuthorizationError('Workspace access denied', 404);
 	return { user, ...row } satisfies WorkspaceContext;

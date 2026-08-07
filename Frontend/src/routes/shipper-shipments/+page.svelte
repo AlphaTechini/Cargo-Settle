@@ -35,7 +35,7 @@
 	$effect(() => {
 		if (!workspaceId) {
 			loading = false;
-			error = 'Sign in and select a workspace to view shipments.';
+			error = 'Select a workspace to view shipments.';
 			return;
 		}
 		if (workspaceId === loadedWorkspaceId) return;
@@ -95,12 +95,7 @@
 	role="shipper"
 >
 	<section class="mx-auto max-w-[1500px] p-5 lg:p-8">
-		<div class="mb-5 flex flex-wrap justify-between gap-3">
-			<div class="flex gap-2">
-				<button class="cs-filter">Status</button><button class="cs-filter">Forwarder</button><button
-					class="cs-filter">Date</button
-				>
-			</div>
+		<div class="mb-5 flex justify-end">
 			<div class="relative">
 				<Icon
 					name="search"
@@ -142,7 +137,10 @@
 									</p></td
 								>
 								<td class="font-extrabold"
-									>{formatFundedAmount(row.fundedAmount, row.fundedCurrency)}</td
+									>{#if row.fundedAmount && row.fundedCurrency}{formatFundedAmount(
+											row.fundedAmount,
+											row.fundedCurrency
+										)}{/if}</td
 								>
 								<td
 									><StatusBadge
@@ -194,9 +192,11 @@
 			<div class="grid grid-cols-2 gap-3">
 				<div class="rounded-xl bg-slate-50 p-4">
 					<p class="cs-muted text-xs">Funded value</p>
-					<p class="mt-1 font-extrabold">
-						{formatFundedAmount(selectedDetail.fundedAmount, selectedDetail.fundedCurrency)}
-					</p>
+					{#if selectedDetail.fundedAmount && selectedDetail.fundedCurrency}<p
+							class="mt-1 font-extrabold"
+						>
+							{formatFundedAmount(selectedDetail.fundedAmount, selectedDetail.fundedCurrency)}
+						</p>{/if}
 				</div>
 				<div class="rounded-xl bg-slate-50 p-4">
 					<p class="cs-muted text-xs">Status</p>
@@ -215,5 +215,5 @@
 							</div>{/each}
 					</div>{:else}<p class="mt-1">No milestones recorded.</p>{/if}
 			</div>
-		</div>{:else}<p class="cs-muted">Shipment details are unavailable.</p>{/if}
+		</div>{:else}<p class="cs-muted">No shipment details loaded.</p>{/if}
 </DemoModal>

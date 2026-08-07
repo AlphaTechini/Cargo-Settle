@@ -1,54 +1,25 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import SettlementRow from '$lib/components/SettlementRow.svelte';
 	import MetricCard from '$lib/components/MetricCard.svelte';
-	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import { formatCurrencyTotals } from '$lib/dashboard';
 	import { downloadCsv } from '$lib/utils';
-	const rows = [
-		{
-			date: 'Jul 29',
-			shipment: 'SHP-2048',
-			route: 'New York -> Rotterdam',
-			forwarder: 'Northstar Freight',
-			funded: '$24,800',
-			allocated: '$11,200',
-			refunded: '-',
-			status: 'In progress',
-			tone: 'info'
-		},
-		{
-			date: 'Jul 24',
-			shipment: 'SHP-2038',
-			route: 'Lagos -> Durban',
-			forwarder: 'Harborline Forwarding',
-			funded: '$38,600',
-			allocated: '$38,600',
-			refunded: '-',
-			status: 'Completed',
-			tone: 'success'
-		},
-		{
-			date: 'Jul 11',
-			shipment: 'SHP-2018',
-			route: 'Miami -> Hamburg',
-			forwarder: 'Northstar Freight',
-			funded: '$29,400',
-			allocated: '$28,900',
-			refunded: '$500',
-			status: 'Completed',
-			tone: 'success'
-		}
-	];
+
+	let { data }: { data: PageData } = $props();
+	let rows = $derived(data.settlements.rows);
+
 	function exportSettlements() {
 		downloadCsv('cargosettle-shipper-settlements.csv', [
-			['Date', 'Shipment', 'Forwarder', 'Funded', 'Allocated', 'Refunded'],
+			['Date', 'Shipment', 'Forwarder', 'Amount', 'Currency', 'Status'],
 			...rows.map((row) => [
-				row.date,
-				row.shipment,
+				row.confirmedAt ?? row.createdAt,
+				row.shipment.reference,
 				row.forwarder,
-				row.funded,
-				row.allocated,
-				row.refunded
+				row.amount,
+				row.currency.toUpperCase(),
+				row.status
 			])
 		]);
 	}
@@ -64,22 +35,28 @@
 		<div class="mb-5 grid gap-4 md:grid-cols-3">
 			<MetricCard
 				label="Funded this year"
-				value="$684.2K"
-				note="42 shipments"
+				value={formatCurrencyTotals(data.settlements.summary.fundedTotals)}
+				note={data.settlements.summary.fundedTotals.length
+					? 'Confirmed funding intents'
+					: 'No confirmed funding this year'}
 				icon="wallet"
-			/><MetricCard label="Allocated" value="$621.8K" note="90.9%" icon="receipt" /><MetricCard
-				label="Refunded"
-				value="$12.6K"
-				note="3 adjustments"
-				icon="dollar"
+			/>
+			<MetricCard
+				label="Allocated"
+				value={formatCurrencyTotals(data.settlements.summary.allocatedTotals)}
+				note={data.settlements.summary.allocatedTotals.length
+					? 'Confirmed settlements'
+					: 'No confirmed settlements this year'}
+				icon="receipt"
+			/>
+			<MetricCard
+				label="Settlement records"
+				value={String(rows.length)}
+				note={rows.length ? 'Records in this workspace' : 'No settlement records yet'}
+				icon="check-circle"
 			/>
 		</div>
 		<div class="mb-5 flex justify-between gap-3">
-			<div class="flex gap-2">
-				<button class="cs-filter">Status</button><button class="cs-filter">Forwarder</button><button
-					class="cs-filter">Date</button
-				>
-			</div>
 			<button class="cs-btn cs-btn-secondary" onclick={exportSettlements}
 				><Icon name="download" size={16} />Export</button
 			>
@@ -87,20 +64,16 @@
 		<div class="cs-card overflow-x-auto">
 			<table class="cs-table min-w-[950px]">
 				<thead
-					><tr
-						><th>Date</th><th>Shipment</th><th>Forwarder</th><th>Funded</th><th>Allocated</th><th
-							>Refunded</th
-						><th>Status</th></tr
+					><tr><th>Date</th><th>Shipment</th><th>Forwarder</th><th>Amount</th><th>Status</th></tr
 					></thead
-				><tbody
-					>{#each rows as row (row.shipment)}<tr
-							><td>{row.date}</td><td
-								><b>{row.shipment}</b><br /><span class="cs-muted text-xs">{row.route}</span></td
-							><td>{row.forwarder}</td><td>{row.funded}</td><td>{row.allocated}</td><td
-								>{row.refunded}</td
-							><td><StatusBadge label={row.status} tone={row.tone} /></td></tr
-						>{/each}</tbody
-				>
+				><tbody>
+					{#if rows.length === 0}
+						<tr><td colspan="5" class="cs-muted p-8 text-center">No settlement records yet.</td></tr
+						>
+					{:else}
+						{#each rows as row (row.id)}<SettlementRow {row} />{/each}
+					{/if}
+				</tbody>
 			</table>
 		</div>
 	</section>

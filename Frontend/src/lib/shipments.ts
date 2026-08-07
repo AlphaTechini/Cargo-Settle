@@ -220,6 +220,6 @@ export function formatDate(value: string | null | undefined) {
 }
 
 export function formatFundedAmount(amount: string | null, currency: SettlementCurrency | null) {
-	if (!amount) return 'Not recorded';
+	if (!amount) return '';
 	return `${amount} ${currency?.toUpperCase() ?? ''}`.trim();
 }

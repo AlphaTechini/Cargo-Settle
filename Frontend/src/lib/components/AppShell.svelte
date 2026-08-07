@@ -18,7 +18,6 @@
 
 	let mobileMenuOpen = $state(false);
 	let searchOpen = $state(false);
-	let notificationsOpen = $state(false);
 	let workspaceOpen = $state(false);
 	let profileOpen = $state(false);
 
@@ -26,9 +25,6 @@
 		forwarder: {
 			label: 'Freight forwarder',
 			workspaceLabel: 'Workspace',
-			workspace: 'Northstar Freight',
-			person: 'Amara Dike',
-			initials: 'AD',
 			links: [
 				['overview', 'Overview', 'layout-dashboard', '/forwarder-dashboard'],
 				['shipments', 'Shipments', 'container', '/forwarder-shipments'],
@@ -41,9 +37,6 @@
 		partner: {
 			label: 'Logistics partner',
 			workspaceLabel: 'Partner portal',
-			workspace: 'Metro Logistics',
-			person: 'Marcus Owen',
-			initials: 'MO',
 			links: [
 				['overview', 'Overview', 'layout-dashboard', '/partner-dashboard'],
 				['shipments', 'Assigned shipments', 'container', '/partner-shipments'],
@@ -54,9 +47,6 @@
 		shipper: {
 			label: 'Shipper',
 			workspaceLabel: 'Shipper portal',
-			workspace: 'Atlas Home Imports',
-			person: 'Elena Cruz',
-			initials: 'EC',
 			links: [
 				['overview', 'Overview', 'layout-dashboard', '/shipper-dashboard'],
 				['shipments', 'Shipments', 'container', '/shipper-shipments'],
@@ -69,8 +59,18 @@
 	let details = $derived(roleDetails[role as Role]);
 	let currentUser = $derived(page.data.user);
 	let activeWorkspace = $derived(page.data.activeWorkspace);
-	let workspaceName = $derived(activeWorkspace?.name ?? details.workspace);
-	let profileName = $derived(currentUser?.displayName ?? details.person);
+	let workspaceName = $derived(activeWorkspace?.name ?? 'No workspace selected');
+	let profileName = $derived(currentUser?.displayName ?? 'Signed out');
+	let profileInitials = $derived(currentUser ? getInitials(currentUser.displayName) : '??');
+
+	function getInitials(name: string) {
+		return name
+			.split(/\s+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((part) => part[0]?.toUpperCase() ?? '')
+			.join('');
+	}
 
 	async function logout() {
 		await fetch('/api/auth/logout', { method: 'POST' });
@@ -146,7 +146,7 @@
 		{/if}
 		<div class="cs-card-sm relative mt-auto flex items-center gap-3 p-3">
 			<div class="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-sm font-extrabold">
-				{details.initials}
+				{profileInitials}
 			</div>
 			<div class="min-w-0">
 				<p class="truncate text-sm font-bold">{profileName}</p>
@@ -198,27 +198,6 @@
 						>Ctrl K</kbd
 					></button
 				>
-				<div class="relative">
-					<button
-						class="cs-btn cs-btn-secondary relative !px-3"
-						aria-label="Toggle notifications"
-						onclick={() => (notificationsOpen = !notificationsOpen)}
-						><Icon name="bell" size={16} /><span
-							class="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[.6rem] text-white"
-							>3</span
-						></button
-					>{#if notificationsOpen}<div
-							class="cs-card cs-shadow absolute top-full right-0 z-40 mt-2 w-72 p-4"
-						>
-							<p class="font-extrabold">Notifications</p>
-							<p class="cs-muted mt-2 text-sm">3 operational items need review today.</p>
-							<a
-								class="mt-3 block text-sm font-bold text-teal-700"
-								href="/forwarder-inbox"
-								onclick={() => (notificationsOpen = false)}>Open operations inbox</a
-							>
-						</div>{/if}
-				</div>
 				{#if role === 'forwarder'}<a
 						href="/forwarder-create-shipment"
 						class="cs-btn cs-btn-primary hidden sm:inline-flex"
