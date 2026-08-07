@@ -44,7 +44,7 @@
 	$effect(() => {
 		if (!workspaceId) {
 			loading = false;
-			error = 'Sign in and select a workspace to view shipments.';
+			error = 'Select a workspace to view shipments.';
 			return;
 		}
 		if (workspaceId === loadedWorkspaceId) return;
@@ -148,11 +148,6 @@
 >
 	<section class="mx-auto max-w-[1500px] p-5 lg:p-8">
 		<div class="mb-5 flex flex-wrap justify-between gap-3">
-			<div class="flex gap-2">
-				<button class="cs-filter">Status</button><button class="cs-filter">Milestone</button><button
-					class="cs-filter">Due date</button
-				>
-			</div>
 			<div class="relative">
 				<Icon
 					name="search"

@@ -17,7 +17,6 @@
 	} from '$lib/shipments';
 
 	let query = $state('');
-	let selected = $state<string[]>([]);
 	let activeFilter = $state<ShipmentStatus | 'all'>('all');
 	let shipments = $state<ShipmentListItem[]>([]);
 	let members = $state<WorkspaceMember[]>([]);
@@ -72,7 +71,6 @@
 			shipments = result.items;
 			nextCursor = result.nextCursor;
 			cursor = next;
-			selected = [];
 		} catch (requestError) {
 			error = requestError instanceof Error ? requestError.message : 'Unable to load shipments';
 		} finally {
@@ -99,10 +97,6 @@
 		if (!error) cursorHistory = cursorHistory.slice(0, -1);
 	}
 
-	function toggle(id: string) {
-		selected = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
-	}
-
 	function memberName(userId: string) {
 		return members.find((member) => member.userId === userId)?.displayName ?? 'Workspace member';
 	}
@@ -124,9 +118,6 @@
 					<option value="completed">Completed</option>
 					<option value="cancelled">Cancelled</option>
 				</select>
-				<button class="cs-filter">Route</button>
-				<button class="cs-filter">Client</button>
-				<button class="cs-filter">Due date</button>
 			</div>
 			<div class="relative">
 				<Icon
@@ -169,25 +160,17 @@
 			<table class="cs-table min-w-[1100px]">
 				<thead>
 					<tr>
-						<th
-							><input
-								type="checkbox"
-								checked={selected.length === filtered.length && filtered.length > 0}
-								onchange={() =>
-									(selected =
-										selected.length === filtered.length ? [] : filtered.map((item) => item.id))}
-							/></th
-						><th>Shipment</th><th>Route / client</th><th>Partners</th><th>Funded value</th><th
-							>Status</th
-						><th>Next milestone</th><th></th>
+						<th>Shipment</th><th>Route / client</th><th>Funded value</th><th>Status</th><th
+							>Updated</th
+						>
 					</tr>
 				</thead>
 				<tbody>
 					{#if loading}
-						<tr><td colspan="8" class="cs-muted p-8 text-center">Loading shipments...</td></tr>
+						<tr><td colspan="5" class="cs-muted p-8 text-center">Loading shipments...</td></tr>
 					{:else if !filtered.length}
 						<tr
-							><td colspan="8" class="cs-muted p-8 text-center"
+							><td colspan="5" class="cs-muted p-8 text-center"
 								>No shipments match the current filters.</td
 							></tr
 						>
@@ -195,39 +178,30 @@
 						{#each filtered as shipment (shipment.id)}
 							<tr>
 								<td
-									><input
-										type="checkbox"
-										checked={selected.includes(shipment.id)}
-										onchange={() => toggle(shipment.id)}
-									/></td
-								><td
 									><a
 										href={`/forwarder-shipment-detail?id=${shipment.id}`}
 										class="font-extrabold text-teal-700">{shipment.reference}</a
 									></td
-								><td
-									><p class="font-bold">{shipment.origin} -> {shipment.destination}</p>
+								>
+								<td>
+									<p class="font-bold">{shipment.origin} -> {shipment.destination}</p>
 									<p class="cs-muted mt-1 text-xs">
 										{memberName(shipment.shipperId)} · {shipment.mode}
-									</p></td
-								><td>Workspace record</td><td class="cs-money font-bold"
-									>{formatFundedAmount(shipment.fundedAmount, shipment.fundedCurrency)}</td
-								><td
+									</p>
+								</td>
+								<td class="cs-money font-bold">
+									{#if shipment.fundedAmount && shipment.fundedCurrency}{formatFundedAmount(
+											shipment.fundedAmount,
+											shipment.fundedCurrency
+										)}{/if}
+								</td>
+								<td
 									><StatusBadge
 										label={shipmentStatusLabel(shipment.status)}
 										tone={shipmentStatusTone(shipment.status)}
 									/></td
-								><td
-									><p class="text-sm font-semibold">Open shipment</p>
-									<p class="cs-muted mt-1 text-xs">Created {formatDate(shipment.createdAt)}</p></td
-								><td>
-									<button
-										class="cs-muted rounded-lg p-2"
-										aria-label={`Open ${shipment.reference}`}
-										onclick={() => (query = shipment.reference)}
-										><Icon name="more" size={16} /></button
-									>
-								</td>
+								>
+								<td><p class="text-sm font-semibold">{formatDate(shipment.updatedAt)}</p></td>
 							</tr>
 						{/each}
 					{/if}
@@ -235,11 +209,7 @@
 			</table>
 		</div>
 		<div class="cs-muted mt-4 flex items-center justify-between text-sm">
-			<span
-				>Showing {filtered.length} shipments{selected.length
-					? ` · ${selected.length} selected`
-					: ''}</span
-			>
+			<span>Showing {filtered.length} shipments</span>
 			<div class="flex gap-2">
 				<button
 					class="cs-btn cs-btn-secondary"

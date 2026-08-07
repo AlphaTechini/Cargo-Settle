@@ -1,48 +1,32 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import MetricCard from '$lib/components/MetricCard.svelte';
-	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import RoleSettlementRow from '$lib/components/RoleSettlementRow.svelte';
+	import { formatCurrencyAmount, formatCurrencyTotals } from '$lib/dashboard';
 	import { downloadCsv } from '$lib/utils';
-	const payments = [
-		{
-			date: 'Jul 29',
-			shipment: 'SHP-2062',
-			route: 'Antwerp -> Lagos',
-			type: 'Early payment',
-			gross: '$7,000',
-			fee: '$200',
-			net: '$6,800 USDC'
-		},
-		{
-			date: 'Jul 22',
-			shipment: 'SHP-2042',
-			route: 'New York -> Hamburg',
-			type: 'Milestone payout',
-			gross: '$8,400',
-			fee: '-',
-			net: '$8,400 USDC'
-		},
-		{
-			date: 'Jul 17',
-			shipment: 'SHP-2038',
-			route: 'Lagos -> Durban',
-			type: 'Partner payout',
-			gross: '$11,200',
-			fee: '-',
-			net: '$11,200 USDC'
-		}
-	];
+
+	let { data }: { data: PageData } = $props();
+	let query = $state('');
+	let filtered = $derived(
+		data.payments.rows.filter((row) =>
+			`${row.id} ${row.shipment.reference} ${row.recipient}`
+				.toLowerCase()
+				.includes(query.toLowerCase())
+		)
+	);
+
 	function exportPayments() {
 		downloadCsv('cargosettle-partner-payments.csv', [
-			['Date', 'Shipment', 'Type', 'Gross', 'Fee', 'Net received'],
-			...payments.map((payment) => [
-				payment.date,
-				payment.shipment,
-				payment.type,
-				payment.gross,
-				payment.fee,
-				payment.net
+			['Date', 'Settlement', 'Shipment', 'Recipient', 'Amount', 'Status'],
+			...data.payments.rows.map((row) => [
+				row.confirmedAt ?? row.createdAt,
+				row.id,
+				row.shipment.reference,
+				row.recipient,
+				`${row.amount} ${row.currency.toUpperCase()}`,
+				row.status
 			])
 		]);
 	}
@@ -58,44 +42,56 @@
 		<div class="mb-5 grid gap-4 md:grid-cols-3">
 			<MetricCard
 				label="Received this month"
-				value="$26,400"
-				note="4 settlements"
+				value={formatCurrencyTotals(data.payments.settledThisMonth)}
+				note="Confirmed settlements"
 				icon="dollar"
-			/><MetricCard
+			/>
+			<MetricCard
 				label="Processing"
-				value="EURC 3,800"
-				note="1 obligation"
+				value={formatCurrencyTotals(data.payments.processing)}
+				note="Pending or submitted"
 				icon="clock"
-			/><MetricCard label="Next scheduled" value="$12,400" note="Aug 3" icon="receipt" />
+			/>
+			<MetricCard
+				label="Next scheduled"
+				value={data.dashboard.upcomingObligations[0]
+					? formatCurrencyAmount(
+							data.dashboard.upcomingObligations[0].amount,
+							data.dashboard.upcomingObligations[0].currency
+						)
+					: '0'}
+				note={data.dashboard.upcomingObligations[0]
+					? data.dashboard.upcomingObligations[0].shipmentReference
+					: 'No upcoming obligation'}
+				icon="receipt"
+			/>
 		</div>
-		<div class="mb-5 flex justify-between gap-3">
-			<div class="flex gap-2">
-				<button class="cs-filter">Currency</button><button class="cs-filter">Status</button><button
-					class="cs-filter">Date</button
-				>
+		<div class="mb-5 flex flex-wrap justify-between gap-3">
+			<div class="relative">
+				<Icon
+					name="search"
+					size={16}
+					className="absolute top-1/2 left-3 -translate-y-1/2 cs-muted"
+				/>
+				<input class="cs-input !w-[300px] !pl-9" bind:value={query} placeholder="Search payments" />
 			</div>
-			<button class="cs-btn cs-btn-secondary" onclick={exportPayments}
-				><Icon name="download" size={16} />Export</button
-			>
+			<button class="cs-btn cs-btn-secondary" onclick={exportPayments}>
+				<Icon name="download" size={16} />Export
+			</button>
 		</div>
 		<div class="cs-card overflow-x-auto">
-			<table class="cs-table min-w-[900px]">
+			<table class="cs-table min-w-[950px]">
 				<thead
-					><tr
-						><th>Date</th><th>Shipment</th><th>Type</th><th>Gross</th><th>Fee</th><th
-							>Net received</th
-						><th>Status</th></tr
+					><tr><th>Date</th><th>Shipment</th><th>Recipient</th><th>Amount</th><th>Status</th></tr
 					></thead
-				><tbody
-					>{#each payments as payment (payment.shipment)}<tr
-							><td>{payment.date}</td><td
-								><b>{payment.shipment}</b><br /><span class="cs-muted text-xs">{payment.route}</span
-								></td
-							><td>{payment.type}</td><td>{payment.gross}</td><td>{payment.fee}</td><td
-								class="font-extrabold">{payment.net}</td
-							><td><StatusBadge label="Confirmed" tone="success" /></td></tr
-						>{/each}</tbody
 				>
+				<tbody>
+					{#if filtered.length === 0}
+						<tr><td colspan="5" class="cs-muted p-8 text-center">No payment records found.</td></tr>
+					{:else}
+						{#each filtered as row (row.id)}<RoleSettlementRow {row} />{/each}
+					{/if}
+				</tbody>
 			</table>
 		</div>
 	</section>

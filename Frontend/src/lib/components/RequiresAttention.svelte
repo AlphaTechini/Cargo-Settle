@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { DashboardAttentionItem } from '$lib/dashboard';
+	import type { OperationAttentionItem } from '$lib/operations';
 	import Icon from './Icon.svelte';
 
-	let { items } = $props<{ items: DashboardAttentionItem[] }>();
+	let { items } = $props<{ items: Array<DashboardAttentionItem | OperationAttentionItem> }>();
 </script>
 
 <div class="cs-card p-5">
