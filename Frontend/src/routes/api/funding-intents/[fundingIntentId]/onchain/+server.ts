@@ -5,6 +5,7 @@ import { verifyShipmentFundedReceipt } from '$lib/server/chain/verification';
 import { requireShipperWorkspace } from '$lib/server/dashboard/shipper-service';
 import { getDb } from '$lib/server/db';
 import { fundingIntents, shipments, walletConnections } from '$lib/server/db/schema';
+import { createNotifications } from '$lib/server/notifications/service';
 
 export const POST: RequestHandler = async (event) => {
 	try {
@@ -32,7 +33,9 @@ export const POST: RequestHandler = async (event) => {
 				currency: fundingIntents.currency,
 				status: fundingIntents.status,
 				shipmentId: shipments.id,
+				shipmentReference: shipments.reference,
 				shipmentStatus: shipments.status,
+				freightForwarderId: shipments.freightForwarderId,
 				shipperWallet: walletConnections.address
 			})
 			.from(fundingIntents)
@@ -81,6 +84,19 @@ export const POST: RequestHandler = async (event) => {
 				updatedAt: now
 			})
 			.where(eq(shipments.id, intent.shipmentId));
+		if (intent.freightForwarderId !== context.user.id) {
+			await createNotifications([
+				{
+					workspaceId: context.workspace.id,
+					userId: intent.freightForwarderId,
+					type: 'funding',
+					title: 'Funding confirmed',
+					body: `${intent.shipmentReference} funding was confirmed on-chain.`,
+					entityType: 'funding_intent',
+					entityId: intent.id
+				}
+			]);
+		}
 
 		return json({
 			fundingIntentId: intent.id,

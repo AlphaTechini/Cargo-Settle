@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { requireAccessRole } from '$lib/server/auth/authorization';
 import type { WorkspaceContext } from '$lib/server/auth/authorization';
 import { getDb } from '$lib/server/db';
+import { createNotifications, notifyShipmentUsers } from '$lib/server/notifications/service';
 import {
 	auditEvents,
 	shipmentMilestones,
@@ -116,12 +117,26 @@ export async function createShipment(context: WorkspaceContext, input: CreateShi
 		});
 		return shipment.id;
 	});
-	return getShipment(
+	const shipment = await getShipment(
 		context.workspace.id,
 		context.user.id,
 		context.membership.businessRole,
 		shipmentId
 	);
+	if (!shipment)
+		throw new ShipmentServiceError('Shipment was created but could not be loaded', 500);
+	await createNotifications([
+		{
+			workspaceId: context.workspace.id,
+			userId: input.shipperId,
+			type: 'funding',
+			title: 'Shipment ready for funding',
+			body: `${shipment.reference} was created and is ready for your funding review.`,
+			entityType: 'shipment',
+			entityId: shipment.id
+		}
+	]);
+	return shipment;
 }
 
 export async function updateShipment(
@@ -196,6 +211,16 @@ export async function transitionShipment(
 		action: 'shipment.status_changed',
 		metadata: { from: current.status, to: nextStatus }
 	});
+	await notifyShipmentUsers({
+		workspaceId: context.workspace.id,
+		shipmentId,
+		actorId: context.user.id,
+		type: 'system',
+		title: 'Shipment status updated',
+		body: `Shipment status changed from ${current.status.replace('_', ' ')} to ${nextStatus.replace('_', ' ')}.`,
+		entityType: 'shipment',
+		entityId: shipmentId
+	});
 	return shipment;
 }
 
@@ -253,6 +278,17 @@ export async function addParticipant(
 		action: 'shipment.participant_added',
 		metadata: { participantId: userId, serviceType }
 	});
+	await createNotifications([
+		{
+			workspaceId: context.workspace.id,
+			userId,
+			type: 'system',
+			title: 'Shipment assignment',
+			body: `You were assigned to shipment ${shipmentId} as a logistics partner.`,
+			entityType: 'shipment',
+			entityId: shipmentId
+		}
+	]);
 	return participant;
 }
 
@@ -304,6 +340,16 @@ export async function updateMilestone(
 		entityId: milestoneId,
 		action: 'shipment.milestone_updated',
 		metadata: { shipmentId, status }
+	});
+	await notifyShipmentUsers({
+		workspaceId: context.workspace.id,
+		shipmentId,
+		actorId: context.user.id,
+		type: 'milestone',
+		title: 'Shipment milestone updated',
+		body: `Milestone status changed to ${status.replace('_', ' ')}.`,
+		entityType: 'shipment_milestone',
+		entityId: milestoneId
 	});
 	return milestone;
 }
@@ -365,6 +411,16 @@ export async function addDocumentMetadata(
 		entityId: document.id,
 		action: 'shipment.document_added',
 		metadata: { shipmentId, milestoneId: input.milestoneId }
+	});
+	await notifyShipmentUsers({
+		workspaceId: context.workspace.id,
+		shipmentId,
+		actorId: context.user.id,
+		type: 'system',
+		title: 'Shipment document uploaded',
+		body: `${input.fileName} was uploaded to shipment ${shipmentId}.`,
+		entityType: 'shipment_document',
+		entityId: document.id
 	});
 	return document;
 }

@@ -2,11 +2,23 @@ import { and, eq, gt } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import {
 	notifications,
+	shipmentParticipants,
+	shipments,
 	workspaceInvitations,
 	workspaceMembers,
 	workspaces
 } from '$lib/server/db/schema';
 import { listUserNotifications } from './repository';
+
+export type NotificationInput = {
+	workspaceId: string;
+	userId: string;
+	type: 'milestone' | 'funding' | 'settlement' | 'early_payment' | 'system';
+	title: string;
+	body: string;
+	entityType?: string;
+	entityId?: string;
+};
 
 export class NotificationServiceError extends Error {
 	constructor(
@@ -19,13 +31,72 @@ export class NotificationServiceError extends Error {
 
 export { listUserNotifications };
 
+export async function createNotifications(inputs: NotificationInput[]) {
+	if (inputs.length === 0) return;
+	const unique = new Map(
+		inputs.map((input) => [
+			`${input.userId}:${input.entityType ?? ''}:${input.entityId ?? ''}:${input.title}`,
+			input
+		])
+	);
+	await getDb()
+		.insert(notifications)
+		.values([...unique.values()]);
+}
+
+export async function notifyShipmentUsers(input: {
+	workspaceId: string;
+	shipmentId: string;
+	actorId?: string;
+	type: NotificationInput['type'];
+	title: string;
+	body: string;
+	entityType: string;
+	entityId: string;
+}) {
+	const db = getDb();
+	const [shipment] = await db
+		.select({
+			workspaceId: shipments.workspaceId,
+			shipperId: shipments.shipperId,
+			freightForwarderId: shipments.freightForwarderId
+		})
+		.from(shipments)
+		.where(and(eq(shipments.id, input.shipmentId), eq(shipments.workspaceId, input.workspaceId)))
+		.limit(1);
+	if (!shipment) return;
+
+	const participants = await db
+		.select({ userId: shipmentParticipants.logisticsPartnerId })
+		.from(shipmentParticipants)
+		.where(eq(shipmentParticipants.shipmentId, input.shipmentId));
+	const recipientIds = new Set([
+		shipment.shipperId,
+		shipment.freightForwarderId,
+		...participants.map((participant) => participant.userId)
+	]);
+	if (input.actorId) recipientIds.delete(input.actorId);
+
+	await createNotifications(
+		[...recipientIds].map((userId) => ({
+			workspaceId: shipment.workspaceId,
+			userId,
+			type: input.type,
+			title: input.title,
+			body: input.body,
+			entityType: input.entityType,
+			entityId: input.entityId
+		}))
+	);
+}
+
 export async function acceptInvitationNotification(
 	userId: string,
 	userEmail: string,
 	notificationId: string
 ) {
 	const db = getDb();
-	return db.transaction(async (tx) => {
+	const result = await db.transaction(async (tx) => {
 		const [notification] = await tx
 			.select({
 				entityType: notifications.entityType,
@@ -50,7 +121,8 @@ export async function acceptInvitationNotification(
 				businessRole: workspaceInvitations.businessRole,
 				accessRole: workspaceInvitations.accessRole,
 				workspaceName: workspaces.name,
-				workspaceSlug: workspaces.slug
+				workspaceSlug: workspaces.slug,
+				createdBy: workspaceInvitations.createdBy
 			})
 			.from(workspaceInvitations)
 			.innerJoin(workspaces, eq(workspaceInvitations.workspaceId, workspaces.id))
@@ -87,7 +159,30 @@ export async function acceptInvitationNotification(
 			id: invitation.workspaceId,
 			name: invitation.workspaceName,
 			slug: invitation.workspaceSlug,
-			businessRole: invitation.businessRole
+			businessRole: invitation.businessRole,
+			invitationId: invitation.id,
+			inviterId: invitation.createdBy
 		};
 	});
+
+	if (result.inviterId !== userId) {
+		await createNotifications([
+			{
+				workspaceId: result.id,
+				userId: result.inviterId,
+				type: 'system',
+				title: 'Invitation accepted',
+				body: `${userEmail} accepted the invitation to ${result.name}.`,
+				entityType: 'workspace_invitation',
+				entityId: result.invitationId
+			}
+		]);
+	}
+
+	return {
+		id: result.id,
+		name: result.name,
+		slug: result.slug,
+		businessRole: result.businessRole
+	};
 }
