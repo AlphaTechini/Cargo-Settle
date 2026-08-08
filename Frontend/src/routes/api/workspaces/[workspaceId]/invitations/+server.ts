@@ -3,7 +3,11 @@ import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { authErrorResponse } from '$lib/server/auth/http';
-import { requireAccessRole, requireWorkspaceMember } from '$lib/server/auth/authorization';
+import {
+	requireAccessRole,
+	requireBusinessRole,
+	requireWorkspaceMember
+} from '$lib/server/auth/authorization';
 import { hashToken } from '$lib/server/auth/sessions';
 import type { AccessRole, BusinessRole } from '$lib/server/auth/types';
 import { getDb } from '$lib/server/db';
@@ -15,9 +19,12 @@ const accessRoles = new Set<AccessRole>(['admin', 'operator', 'finance', 'member
 
 export const POST: RequestHandler = async (event) => {
 	try {
-		const context = requireAccessRole(
-			await requireWorkspaceMember(event, event.params.workspaceId),
-			['owner', 'admin']
+		const context = requireBusinessRole(
+			requireAccessRole(await requireWorkspaceMember(event, event.params.workspaceId), [
+				'owner',
+				'admin'
+			]),
+			['freight_forwarder']
 		);
 		const body = (await event.request.json()) as {
 			email?: unknown;
@@ -93,9 +100,12 @@ export const POST: RequestHandler = async (event) => {
 
 export const GET: RequestHandler = async (event) => {
 	try {
-		const context = requireAccessRole(
-			await requireWorkspaceMember(event, event.params.workspaceId),
-			['owner', 'admin']
+		const context = requireBusinessRole(
+			requireAccessRole(await requireWorkspaceMember(event, event.params.workspaceId), [
+				'owner',
+				'admin'
+			]),
+			['freight_forwarder']
 		);
 		const db = getDb();
 		const invitations = await db

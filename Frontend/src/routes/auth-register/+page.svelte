@@ -62,15 +62,18 @@
 					businessRole: roleValues[selectedRole as keyof typeof roleValues]
 				})
 			});
-			const result = (await response.json()) as { error?: string };
+			const result = (await response.json()) as {
+				error?: string;
+				businessRole?: 'shipper' | 'freight_forwarder' | 'logistics_partner';
+			};
 			if (!response.ok) {
 				error = result.error ?? 'Unable to create your workspace';
 				return;
 			}
 			await goto(
-				selectedRole === 'forwarder'
+				result.businessRole === 'freight_forwarder'
 					? '/forwarder-dashboard'
-					: selectedRole === 'partner'
+					: result.businessRole === 'logistics_partner'
 						? '/partner-dashboard'
 						: '/shipper-dashboard'
 			);
@@ -97,8 +100,8 @@
 			How will your company use CargoSettle?
 		</h1>
 		<p class="cs-muted mt-3">
-			Choose the role that best matches your place in a shipment. You can invite additional team
-			members after setup.
+			Freight forwarders create workspaces. Shippers and logistics partners join the workspaces that
+			invite their email address.
 		</p>
 	</div>
 	<div class="mt-9 grid gap-5 md:grid-cols-3">
@@ -151,12 +154,15 @@
 			/>
 		</div>
 		<div>
-			<label class="cs-label" for="company">Company name</label><input
+			<label class="cs-label" for="company">Workspace name (forwarders)</label><input
 				id="company"
 				class="cs-input"
 				bind:value={company}
 				placeholder="Northstar Freight"
 			/>
+			<p class="cs-muted mt-2 text-xs">
+				Leave this blank when registering from a forwarder invitation.
+			</p>
 		</div>
 		<div>
 			<label class="cs-label" for="region">Primary operating region</label><select
@@ -173,9 +179,16 @@
 				Selected role: <span class="font-bold text-teal-700"
 					>{roles.find((role) => role.id === selectedRole)?.label}</span
 				>
+				<span class="mt-1 block text-xs"
+					>An invitation determines the workspace role when this email is already whitelisted.</span
+				>
 			</p>
 			<button type="submit" class="cs-btn cs-btn-primary" disabled={loading}
-				>{loading ? 'Creating...' : 'Create workspace'}
+				>{loading
+					? 'Creating...'
+					: selectedRole === 'forwarder'
+						? 'Create workspace'
+						: 'Create account'}
 				<Icon name="arrow-right" size={16} /></button
 			>
 		</div>

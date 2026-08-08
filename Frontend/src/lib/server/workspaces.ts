@@ -62,6 +62,12 @@ export async function getUserWorkspace(userId: string, workspaceId: string) {
 }
 
 export async function createWorkspaceForUser(userId: string, input: WorkspaceInput) {
+	if (input.businessRole !== 'freight_forwarder') {
+		throw new WorkspaceServiceError(
+			'Only freight forwarders can create operational workspaces',
+			403
+		);
+	}
 	const db = getDb();
 	return db.transaction(async (tx) => {
 		const [workspace] = await tx

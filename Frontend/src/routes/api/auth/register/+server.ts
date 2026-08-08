@@ -24,7 +24,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			secure: !dev,
 			maxAge: 60 * 60 * 24 * 30
 		});
-		return json({ user: result.user, workspace: result.workspace }, { status: 201 });
+		return json(
+			{ user: result.user, workspace: result.workspace, businessRole: result.businessRole },
+			{ status: 201 }
+		);
 	} catch (error) {
 		return authErrorResponse(error);
 	}

@@ -34,7 +34,7 @@ export function parseRegistrationInput(value: unknown): RegistrationInput {
 	const email = stringField(body.email, 'email').toLowerCase();
 	const password = stringField(body.password, 'password');
 	const displayName = stringField(body.displayName, 'displayName');
-	const workspaceName = stringField(body.workspaceName, 'workspaceName');
+	const workspaceName = typeof body.workspaceName === 'string' ? body.workspaceName.trim() : '';
 	const businessRole = stringField(body.businessRole, 'businessRole') as BusinessRole;
 
 	if (!email.includes('@') || email.length > 320) throw new AuthInputError('email is invalid');
@@ -42,6 +42,9 @@ export function parseRegistrationInput(value: unknown): RegistrationInput {
 		throw new AuthInputError('password must be between 8 and 128 characters');
 	}
 	if (!businessRoles.has(businessRole)) throw new AuthInputError('businessRole is invalid');
+	if (businessRole === 'freight_forwarder' && workspaceName.length === 0) {
+		throw new AuthInputError('workspaceName is required for freight forwarders');
+	}
 
 	return { email, password, displayName, workspaceName, businessRole };
 }

@@ -1,16 +1,20 @@
 import { and, eq } from 'drizzle-orm';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { authErrorResponse } from '$lib/server/auth/http';
-import { requireAccessRole, requireWorkspaceMember } from '$lib/server/auth/authorization';
+import {
+	requireAccessRole,
+	requireBusinessRole,
+	requireWorkspaceMember
+} from '$lib/server/auth/authorization';
 import { getDb } from '$lib/server/db';
 import { workspaceMembers } from '$lib/server/db/schema';
 import { WorkspaceServiceError } from '$lib/server/workspaces';
 
 export const POST: RequestHandler = async (event) => {
 	try {
-		const context = requireAccessRole(
-			await requireWorkspaceMember(event, event.params.workspaceId),
-			['owner']
+		const context = requireBusinessRole(
+			requireAccessRole(await requireWorkspaceMember(event, event.params.workspaceId), ['owner']),
+			['freight_forwarder']
 		);
 		const body = (await event.request.json()) as { userId?: unknown };
 		if (typeof body.userId !== 'string' || body.userId.length === 0) {
@@ -20,7 +24,11 @@ export const POST: RequestHandler = async (event) => {
 		const targetUserId = body.userId;
 		const result = await db.transaction(async (tx) => {
 			const [target] = await tx
-				.select({ id: workspaceMembers.id, accessRole: workspaceMembers.accessRole })
+				.select({
+					id: workspaceMembers.id,
+					accessRole: workspaceMembers.accessRole,
+					businessRole: workspaceMembers.businessRole
+				})
 				.from(workspaceMembers)
 				.where(
 					and(
@@ -30,6 +38,12 @@ export const POST: RequestHandler = async (event) => {
 				)
 				.limit(1);
 			if (!target) throw new WorkspaceServiceError('Target member not found', 404);
+			if (target.businessRole !== 'freight_forwarder') {
+				throw new WorkspaceServiceError(
+					'Workspace ownership must remain with a freight forwarder',
+					400
+				);
+			}
 			if (target.accessRole === 'owner')
 				throw new WorkspaceServiceError('User is already the owner', 409);
 			await tx
