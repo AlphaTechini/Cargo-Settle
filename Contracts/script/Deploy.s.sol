@@ -8,7 +8,7 @@ import {CargoSettleEscrow} from "../src/CargoSettleEscrow.sol";
 
 contract Deploy is Script {
     function run() external returns (CargoSettleEscrow escrow, CargoSettleEarlyPayment earlyPayment) {
-        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        uint256 privateKey = _privateKey();
         address admin = vm.envAddress("ADMIN_ADDRESS");
         address usdc = vm.envAddress("USDC_ADDRESS");
         address eurc = vm.envAddress("EURC_ADDRESS");
@@ -22,5 +22,14 @@ contract Deploy is Script {
         escrow.grantRole(escrow.SETTLEMENT_ROLE(), address(earlyPayment));
 
         vm.stopBroadcast();
+    }
+
+    function _privateKey() internal view returns (uint256) {
+        string memory value = vm.envString("PRIVATE_KEY");
+        bytes memory raw = bytes(value);
+        if (raw.length >= 2 && raw[0] == bytes1("0") && (raw[1] == bytes1("x") || raw[1] == bytes1("X"))) {
+            return vm.parseUint(value);
+        }
+        return vm.parseUint(string.concat("0x", value));
     }
 }
