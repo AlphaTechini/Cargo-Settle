@@ -11,6 +11,7 @@ export type ShipperFundingRequest = {
 	createdAt: string;
 	confirmedAt: string | null;
 	shipment: {
+		id: string;
 		reference: string;
 		origin: string;
 		destination: string;

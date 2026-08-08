@@ -3,6 +3,7 @@
 	import AppShell from '$lib/components/AppShell.svelte';
 	import DemoModal from '$lib/components/DemoModal.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import OnchainShipmentSetup from '$lib/components/OnchainShipmentSetup.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import {
 		addDocumentMetadata,
@@ -212,6 +213,7 @@
 					</div>
 				</div>
 			</div>
+			<OnchainShipmentSetup shipmentId={shipment.id} />
 			{#if documentUploaded || partnerMessageSent || fxApplied}<div
 					class="mt-4 grid gap-3 md:grid-cols-3"
 				>

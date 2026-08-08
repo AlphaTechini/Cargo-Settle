@@ -23,6 +23,7 @@ export async function listShipperFundingIntents(
 			createdAt: fundingIntents.createdAt,
 			confirmedAt: fundingIntents.confirmedAt,
 			shipment: {
+				id: shipments.id,
 				reference: shipments.reference,
 				origin: shipments.origin,
 				destination: shipments.destination

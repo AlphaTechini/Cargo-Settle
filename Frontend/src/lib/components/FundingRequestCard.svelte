@@ -2,6 +2,7 @@
 	import type { ShipperFundingRequest } from '$lib/funding';
 	import { fundingStatusLabel, fundingStatusTone } from '$lib/funding';
 	import { formatCurrencyAmount } from '$lib/dashboard';
+	import OnchainFundingButton from './OnchainFundingButton.svelte';
 	import StatusBadge from './StatusBadge.svelte';
 
 	let { request } = $props<{ request: ShipperFundingRequest }>();
@@ -43,4 +44,13 @@
 			<p class="mt-2 font-extrabold">{formatDate(request.createdAt)}</p>
 		</div>
 	</div>
+	{#if ['requested', 'approved', 'processing'].includes(request.status)}
+		<OnchainFundingButton
+			fundingIntentId={request.id}
+			shipmentId={request.shipment.id}
+			amount={request.amount}
+			currency={request.currency}
+			enabled={request.status === 'requested' || request.status === 'approved'}
+		/>
+	{/if}
 </article>
