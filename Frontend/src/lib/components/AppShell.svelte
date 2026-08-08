@@ -7,6 +7,18 @@
 	import WalletButton from './WalletButton.svelte';
 
 	type Role = 'forwarder' | 'partner' | 'shipper';
+	type NotificationItem = {
+		id: string;
+		title: string;
+		body: string;
+		readAt: string | null;
+		createdAt: string;
+		invitation: {
+			businessRole: 'shipper' | 'freight_forwarder' | 'logistics_partner';
+			workspaceName: string;
+			status: 'pending' | 'accepted';
+		} | null;
+	};
 
 	let {
 		title,
@@ -18,6 +30,10 @@
 
 	let mobileMenuOpen = $state(false);
 	let searchOpen = $state(false);
+	let notificationsOpen = $state(false);
+	let notifications = $state<NotificationItem[]>([]);
+	let notificationsLoaded = $state(false);
+	let notificationsLoading = $state(false);
 	let workspaceOpen = $state(false);
 	let profileOpen = $state(false);
 
@@ -62,6 +78,16 @@
 	let workspaceName = $derived(activeWorkspace?.name ?? 'No workspace selected');
 	let profileName = $derived(currentUser?.displayName ?? 'Signed out');
 	let profileInitials = $derived(currentUser ? getInitials(currentUser.displayName) : '??');
+	let unreadNotificationCount = $derived(notifications.filter((item) => !item.readAt).length);
+
+	$effect(() => {
+		if (!currentUser) {
+			notifications = [];
+			notificationsLoaded = false;
+			return;
+		}
+		if (!notificationsLoaded) void loadNotifications();
+	});
 
 	function getInitials(name: string) {
 		return name
@@ -87,6 +113,34 @@
 			workspaceOpen = false;
 			await invalidateAll();
 		}
+	}
+
+	async function loadNotifications() {
+		notificationsLoading = true;
+		try {
+			const response = await fetch('/api/notifications');
+			if (response.ok) {
+				const result = (await response.json()) as { notifications: NotificationItem[] };
+				notifications = result.notifications;
+			}
+		} finally {
+			notificationsLoaded = true;
+			notificationsLoading = false;
+		}
+	}
+
+	async function acceptNotification(notification: NotificationItem) {
+		const response = await fetch(`/api/notifications/${notification.id}/accept`, {
+			method: 'POST'
+		});
+		if (!response.ok) return;
+		notifications = notifications.filter((item) => item.id !== notification.id);
+		notificationsOpen = false;
+		await invalidateAll();
+		const businessRole = notification.invitation?.businessRole;
+		if (businessRole === 'freight_forwarder') await goto('/forwarder-dashboard');
+		if (businessRole === 'logistics_partner') await goto('/partner-dashboard');
+		if (businessRole === 'shipper') await goto('/shipper-dashboard');
 	}
 </script>
 
@@ -203,6 +257,46 @@
 						class="cs-btn cs-btn-primary hidden sm:inline-flex"
 						><Icon name="plus" size={16} />New shipment</a
 					>{/if}
+				{#if currentUser}
+					<div class="relative">
+						<button
+							class="cs-btn cs-btn-secondary relative !px-3"
+							aria-label="Toggle notifications"
+							onclick={() => (notificationsOpen = !notificationsOpen)}
+							><Icon name="bell" size={16} />{#if unreadNotificationCount > 0}<span
+									class="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[.6rem] text-white"
+									>{unreadNotificationCount}</span
+								>{/if}</button
+						>
+						{#if notificationsOpen}
+							<div class="cs-card cs-shadow absolute top-full right-0 z-40 mt-2 w-[340px] p-4">
+								<div class="flex items-center justify-between">
+									<p class="font-extrabold">Notifications</p>
+									<button class="cs-muted text-xs" onclick={() => (notificationsOpen = false)}
+										>Close</button
+									>
+								</div>
+								{#if notificationsLoading}<p class="cs-muted mt-4 text-sm">
+										Loading notifications...
+									</p>{:else if notifications.length === 0}<p class="cs-muted mt-4 text-sm">
+										No notifications.
+									</p>{:else}<div class="mt-4 space-y-3">
+										{#each notifications as notification (notification.id)}<div
+												class={`rounded-xl p-3 ${notification.readAt ? 'bg-slate-50' : 'bg-teal-50'}`}
+											>
+												<p class="text-sm font-bold">{notification.title}</p>
+												<p class="cs-muted mt-1 text-xs">{notification.body}</p>
+												{#if notification.invitation?.status === 'pending'}<button
+														class="cs-btn cs-btn-primary mt-3 w-full !py-2 text-xs"
+														onclick={() => void acceptNotification(notification)}
+														>Accept invitation</button
+													>{/if}
+											</div>{/each}
+									</div>{/if}
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 		{#if searchOpen}<div class="cs-divider border-t px-5 py-3 lg:px-8">

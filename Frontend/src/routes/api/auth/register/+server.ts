@@ -17,13 +17,15 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			secure: !dev,
 			maxAge: SESSION_TTL_SECONDS
 		});
-		cookies.set(ACTIVE_WORKSPACE_COOKIE, result.workspace.id, {
-			path: '/',
-			httpOnly: true,
-			sameSite: 'lax',
-			secure: !dev,
-			maxAge: 60 * 60 * 24 * 30
-		});
+		if (result.workspace) {
+			cookies.set(ACTIVE_WORKSPACE_COOKIE, result.workspace.id, {
+				path: '/',
+				httpOnly: true,
+				sameSite: 'lax',
+				secure: !dev,
+				maxAge: 60 * 60 * 24 * 30
+			});
+		}
 		return json(
 			{ user: result.user, workspace: result.workspace, businessRole: result.businessRole },
 			{ status: 201 }

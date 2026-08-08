@@ -1,7 +1,13 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '$lib/server/db';
-import { users, workspaceInvitations, workspaceMembers, workspaces } from '$lib/server/db/schema';
+import {
+	notifications,
+	users,
+	workspaceInvitations,
+	workspaceMembers,
+	workspaces
+} from '$lib/server/db/schema';
 import { hashPassword, verifyPassword } from './password';
 import { createSession, SESSION_TTL_SHORT_SECONDS } from './sessions';
 import type { BusinessRole } from './types';
@@ -13,65 +19,6 @@ export class AuthServiceError extends Error {
 	) {
 		super(message);
 	}
-}
-
-async function acceptPendingInvitations(
-	db: ReturnType<typeof getDb>,
-	userId: string,
-	email: string
-) {
-	return db.transaction(async (tx) => {
-		const pending = await tx
-			.select({
-				id: workspaceInvitations.id,
-				workspaceId: workspaceInvitations.workspaceId,
-				businessRole: workspaceInvitations.businessRole,
-				accessRole: workspaceInvitations.accessRole,
-				workspace: {
-					id: workspaces.id,
-					name: workspaces.name,
-					slug: workspaces.slug
-				}
-			})
-			.from(workspaceInvitations)
-			.innerJoin(workspaces, eq(workspaceInvitations.workspaceId, workspaces.id))
-			.where(
-				and(
-					eq(workspaceInvitations.email, email),
-					eq(workspaceInvitations.status, 'pending'),
-					gt(workspaceInvitations.expiresAt, new Date())
-				)
-			)
-			.orderBy(asc(workspaceInvitations.createdAt));
-
-		if (pending.length === 0) return [];
-
-		await tx
-			.insert(workspaceMembers)
-			.values(
-				pending.map((invitation) => ({
-					workspaceId: invitation.workspaceId,
-					userId,
-					businessRole: invitation.businessRole,
-					accessRole: invitation.accessRole
-				}))
-			)
-			.onConflictDoNothing();
-		await tx
-			.update(workspaceInvitations)
-			.set({ status: 'accepted', tokenHash: null, acceptedAt: new Date() })
-			.where(
-				inArray(
-					workspaceInvitations.id,
-					pending.map((invitation) => invitation.id)
-				)
-			);
-
-		return pending.map((invitation) => ({
-			businessRole: invitation.businessRole,
-			workspace: invitation.workspace
-		}));
-	});
 }
 
 function workspaceSlug(name: string) {
@@ -128,35 +75,24 @@ export async function registerUser(input: {
 			.orderBy(asc(workspaceInvitations.createdAt));
 
 		if (pendingInvitations.length > 0) {
-			await tx.insert(workspaceMembers).values(
+			await tx.insert(notifications).values(
 				pendingInvitations.map((invitation) => ({
 					workspaceId: invitation.workspaceId,
 					userId: user.id,
-					businessRole: invitation.businessRole,
-					accessRole: invitation.accessRole
+					type: 'system' as const,
+					title: 'Workspace invitation',
+					body: `${invitation.workspace.name} invited you to join as ${invitation.businessRole.replace('_', ' ')}.`,
+					entityType: 'workspace_invitation',
+					entityId: invitation.id
 				}))
 			);
-			await tx
-				.update(workspaceInvitations)
-				.set({ status: 'accepted', tokenHash: null, acceptedAt: new Date() })
-				.where(
-					inArray(
-						workspaceInvitations.id,
-						pendingInvitations.map((invitation) => invitation.id)
-					)
-				);
-			return {
-				user,
-				workspace: pendingInvitations[0].workspace,
-				businessRole: pendingInvitations[0].businessRole
-			};
+			if (input.businessRole !== 'freight_forwarder') {
+				return { user, workspace: null, businessRole: input.businessRole };
+			}
 		}
 
 		if (input.businessRole !== 'freight_forwarder') {
-			throw new AuthServiceError(
-				'An invitation from a freight forwarder is required for this role',
-				403
-			);
+			return { user, workspace: null, businessRole: input.businessRole };
 		}
 
 		const [workspace] = await tx
@@ -196,8 +132,6 @@ export async function loginUser(input: { email: string; password: string; rememb
 	if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
 		throw new AuthServiceError('Invalid email or password', 401);
 	}
-	const acceptedInvitations = await acceptPendingInvitations(db, user.id, user.email);
-
 	const [membership] = await db
 		.select({
 			businessRole: workspaceMembers.businessRole,
@@ -212,16 +146,14 @@ export async function loginUser(input: { email: string; password: string; rememb
 		.where(eq(workspaceMembers.userId, user.id))
 		.orderBy(asc(workspaces.createdAt), asc(workspaceMembers.joinedAt))
 		.limit(1);
-	const selectedMembership = acceptedInvitations[0] ?? membership;
 	const session = await createSession(
 		user.id,
 		input.rememberMe ? undefined : SESSION_TTL_SHORT_SECONDS
 	);
 	return {
 		user: { id: user.id, email: user.email, displayName: user.displayName },
-		businessRole: selectedMembership?.businessRole ?? null,
-		workspace: selectedMembership?.workspace ?? null,
-		acceptedWorkspaces: acceptedInvitations.map((invitation) => invitation.workspace),
+		businessRole: membership?.businessRole ?? null,
+		workspace: membership?.workspace ?? null,
 		session
 	};
 }

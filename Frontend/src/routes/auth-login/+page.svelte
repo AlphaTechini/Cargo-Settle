@@ -49,8 +49,7 @@
 			<p class="text-xs font-extrabold tracking-[.18em] text-teal-700 uppercase">Welcome back</p>
 			<h1 class="mt-3 text-4xl font-extrabold tracking-tight">Sign in to CargoSettle</h1>
 			<p class="cs-muted mt-3">
-				Manage shipments, obligations, and settlement activity from one operational workspace. If a
-				freight forwarder invited this email, sign-in adds the matching workspace automatically.
+				Manage shipments, obligations, and settlement activity from one operational workspace.
 			</p>
 			<form
 				class="mt-8 space-y-5"

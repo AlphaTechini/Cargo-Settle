@@ -11,7 +11,12 @@ import {
 import { hashToken } from '$lib/server/auth/sessions';
 import type { AccessRole, BusinessRole } from '$lib/server/auth/types';
 import { getDb } from '$lib/server/db';
-import { users, workspaceInvitations, workspaceMembers } from '$lib/server/db/schema';
+import {
+	notifications,
+	users,
+	workspaceInvitations,
+	workspaceMembers
+} from '$lib/server/db/schema';
 import { WorkspaceServiceError } from '$lib/server/workspaces';
 
 const businessRoles = new Set<BusinessRole>(['shipper', 'freight_forwarder', 'logistics_partner']);
@@ -88,6 +93,17 @@ export const POST: RequestHandler = async (event) => {
 				createdBy: context.user.id
 			})
 			.returning({ id: workspaceInvitations.id, expiresAt: workspaceInvitations.expiresAt });
+		if (existingUser) {
+			await db.insert(notifications).values({
+				workspaceId: context.workspace.id,
+				userId: existingUser.id,
+				type: 'system',
+				title: 'Workspace invitation',
+				body: `${context.workspace.name} invited you to join as ${businessRole.replace('_', ' ')}.`,
+				entityType: 'workspace_invitation',
+				entityId: invitation.id
+			});
+		}
 
 		return json(
 			{ invitation, invitationToken: dev ? invitationToken : undefined },

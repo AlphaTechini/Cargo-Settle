@@ -65,9 +65,14 @@
 			const result = (await response.json()) as {
 				error?: string;
 				businessRole?: 'shipper' | 'freight_forwarder' | 'logistics_partner';
+				workspace?: { id: string } | null;
 			};
 			if (!response.ok) {
 				error = result.error ?? 'Unable to create your workspace';
+				return;
+			}
+			if (!result.workspace) {
+				await goto(`/account-pending?role=${selectedRole}`);
 				return;
 			}
 			await goto(
@@ -100,8 +105,8 @@
 			How will your company use CargoSettle?
 		</h1>
 		<p class="cs-muted mt-3">
-			Freight forwarders create workspaces. Shippers and logistics partners join the workspaces that
-			invite their email address.
+			Choose the role that best matches your place in a shipment. You can invite additional team
+			members after setup.
 		</p>
 	</div>
 	<div class="mt-9 grid gap-5 md:grid-cols-3">
@@ -154,15 +159,12 @@
 			/>
 		</div>
 		<div>
-			<label class="cs-label" for="company">Workspace name (forwarders)</label><input
+			<label class="cs-label" for="company">Company name</label><input
 				id="company"
 				class="cs-input"
 				bind:value={company}
 				placeholder="Northstar Freight"
 			/>
-			<p class="cs-muted mt-2 text-xs">
-				Leave this blank when registering from a forwarder invitation.
-			</p>
 		</div>
 		<div>
 			<label class="cs-label" for="region">Primary operating region</label><select
@@ -179,16 +181,9 @@
 				Selected role: <span class="font-bold text-teal-700"
 					>{roles.find((role) => role.id === selectedRole)?.label}</span
 				>
-				<span class="mt-1 block text-xs"
-					>An invitation determines the workspace role when this email is already whitelisted.</span
-				>
 			</p>
 			<button type="submit" class="cs-btn cs-btn-primary" disabled={loading}
-				>{loading
-					? 'Creating...'
-					: selectedRole === 'forwarder'
-						? 'Create workspace'
-						: 'Create account'}
+				>{loading ? 'Creating...' : 'Create workspace'}
 				<Icon name="arrow-right" size={16} /></button
 			>
 		</div>
