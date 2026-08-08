@@ -236,7 +236,7 @@
 		</div>
 	</section>
 	<section id="arc" class="mx-auto max-w-[1440px] px-5 py-20 lg:px-10">
-		<div class="cs-card overflow-hidden bg-[#102a36] p-8 text-white lg:p-12">
+		<div class="cs-card overflow-hidden bg-[#102a36] p-8 text-[var(--cs-ink)] lg:p-12">
 			<p class="text-xs font-extrabold tracking-[.18em] text-teal-300 uppercase">
 				The financial layer
 			</p>
