@@ -31,7 +31,8 @@
 					? '/shipper-dashboard'
 					: result.businessRole === 'logistics_partner'
 						? '/partner-dashboard'
-						: '/forwarder-dashboard'
+						: '/forwarder-dashboard',
+				{ invalidateAll: true }
 			);
 		} catch {
 			error = 'The authentication service is unavailable';

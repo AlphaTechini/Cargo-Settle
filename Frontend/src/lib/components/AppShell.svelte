@@ -272,9 +272,16 @@
 							<div class="cs-card cs-shadow absolute top-full right-0 z-40 mt-2 w-[340px] p-4">
 								<div class="flex items-center justify-between">
 									<p class="font-extrabold">Notifications</p>
-									<button class="cs-muted text-xs" onclick={() => (notificationsOpen = false)}
-										>Close</button
-									>
+									<div class="flex items-center gap-3">
+										<a
+											href="/notifications"
+											class="text-xs font-bold text-teal-700"
+											onclick={() => (notificationsOpen = false)}>View all</a
+										>
+										<button class="cs-muted text-xs" onclick={() => (notificationsOpen = false)}
+											>Close</button
+										>
+									</div>
 								</div>
 								{#if notificationsLoading}<p class="cs-muted mt-4 text-sm">
 										Loading notifications...

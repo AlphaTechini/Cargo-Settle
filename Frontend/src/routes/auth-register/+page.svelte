@@ -72,7 +72,7 @@
 				return;
 			}
 			if (!result.workspace) {
-				await goto(`/account-pending?role=${selectedRole}`);
+				await goto(`/account-pending?role=${selectedRole}`, { invalidateAll: true });
 				return;
 			}
 			await goto(
@@ -80,7 +80,8 @@
 					? '/forwarder-dashboard'
 					: result.businessRole === 'logistics_partner'
 						? '/partner-dashboard'
-						: '/shipper-dashboard'
+						: '/shipper-dashboard',
+				{ invalidateAll: true }
 			);
 		} catch {
 			error = 'The authentication service is unavailable';
