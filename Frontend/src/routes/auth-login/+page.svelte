@@ -26,6 +26,10 @@
 				error = result.error ?? 'Unable to sign in';
 				return;
 			}
+			if (!result.businessRole) {
+				await goto('/notifications', { invalidateAll: true });
+				return;
+			}
 			await goto(
 				result.businessRole === 'shipper'
 					? '/shipper-dashboard'
