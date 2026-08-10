@@ -69,7 +69,8 @@
 		if (saved) return;
 		error = validateDetails();
 		if (error) return;
-		if (requestFunding && (!fundingAmount.trim() || Number(fundingAmount) <= 0)) {
+		const normalizedFundingAmount = String(fundingAmount).trim();
+		if (requestFunding && (!normalizedFundingAmount || Number(normalizedFundingAmount) <= 0)) {
 			error = 'Enter a funding amount greater than zero.';
 			return;
 		}
@@ -88,7 +89,7 @@
 				estimatedArrival: estimatedArrival || null,
 				notes: notes || null,
 				...(requestFunding
-					? { funding: { amount: fundingAmount.trim(), currency: fundingCurrency } }
+					? { funding: { amount: normalizedFundingAmount, currency: fundingCurrency } }
 					: {}),
 				...(partnerId
 					? { participants: [{ userId: partnerId, serviceType: partnerServiceType.trim() }] }

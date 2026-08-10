@@ -148,7 +148,9 @@ export async function connectArcWallet() {
 			chainConfiguration: arcChainConfiguration
 		});
 	}
-	const address = getAddress(result.accounts[0]);
+	const connectedAddress = result.accounts?.[0];
+	if (!connectedAddress) throw new Error('The wallet returned no connected account');
+	const address = getAddress(connectedAddress);
 	notify({ address, chainId: ARC_TESTNET_CHAIN_ID_HEX });
 	return { client, address, chainId: ARC_TESTNET_CHAIN_ID_HEX };
 }
@@ -242,31 +244,46 @@ async function sendArcTransaction(to: Address, data: Hex) {
 		throw new Error('Connect MetaMask to Arc Testnet before signing a transaction');
 	}
 	const client = await getWalletClient();
-	return client.getProvider().request({
+	const transactionHash = await client.getProvider().request({
 		method: 'eth_sendTransaction',
 		params: [{ from: current.address, to, data }]
-	}) as Promise<Hex>;
+	});
+	if (typeof transactionHash !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(transactionHash)) {
+		throw new Error('The wallet did not return a valid Arc transaction hash');
+	}
+	return transactionHash as Hex;
 }
 
 export async function sendEscrowTransaction(data: Hex) {
 	return sendArcTransaction(getEscrowAddress(), data);
 }
 
+async function arcRpcRequest<T>(method: string, params: unknown[]) {
+	const response = await fetch(ARC_TESTNET_RPC_URL, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params })
+	});
+	if (!response.ok) throw new Error('Arc RPC is unavailable');
+	const payload = (await response.json()) as {
+		result?: T;
+		error?: { message?: string };
+	};
+	if (payload.error || payload.result === undefined) {
+		throw new Error(payload.error?.message ?? 'Arc RPC returned no result');
+	}
+	return payload.result;
+}
+
 async function callArc(to: Address, data: Hex) {
-	const client = await getWalletClient();
-	return client.getProvider().request({
-		method: 'eth_call',
-		params: [{ to, data }, 'latest']
-	}) as Promise<Hex>;
+	return arcRpcRequest<Hex>('eth_call', [{ to, data }, 'latest']);
 }
 
 export async function waitForArcTransaction(txHash: Hex) {
-	const client = await getWalletClient();
 	for (let attempt = 0; attempt < 90; attempt += 1) {
-		const receipt = (await client.getProvider().request({
-			method: 'eth_getTransactionReceipt',
-			params: [txHash]
-		})) as { status?: Hex } | null;
+		const receipt = await arcRpcRequest<{ status?: Hex } | null>('eth_getTransactionReceipt', [
+			txHash
+		]);
 		if (receipt) {
 			if (receipt.status !== '0x1') throw new Error('The Arc transaction failed on-chain');
 			return receipt;
