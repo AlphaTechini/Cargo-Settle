@@ -66,6 +66,11 @@ const escrowAbi = [
 	}
 ] as const;
 
+const shipmentNotFoundErrorSelector = keccak256(stringToBytes('ShipmentNotFound(bytes32)')).slice(
+	0,
+	10
+);
+
 const erc20Abi = [
 	{
 		type: 'function',
@@ -104,6 +109,15 @@ export type WalletSnapshot = {
 let clientPromise: Promise<MetamaskConnectEVM> | null = null;
 let snapshot: WalletSnapshot = { address: null, chainId: null };
 const listeners = new Set<(next: WalletSnapshot) => void>();
+
+class ArcRpcError extends Error {
+	constructor(
+		message: string,
+		public data: unknown
+	) {
+		super(message);
+	}
+}
 
 function notify(next: WalletSnapshot) {
 	snapshot = next;
@@ -267,12 +281,21 @@ async function arcRpcRequest<T>(method: string, params: unknown[]) {
 	if (!response.ok) throw new Error('Arc RPC is unavailable');
 	const payload = (await response.json()) as {
 		result?: T;
-		error?: { message?: string };
+		error?: { message?: string; data?: unknown };
 	};
 	if (payload.error || payload.result === undefined) {
-		throw new Error(payload.error?.message ?? 'Arc RPC returned no result');
+		throw new ArcRpcError(
+			payload.error?.message ?? 'Arc RPC returned no result',
+			payload.error?.data
+		);
 	}
 	return payload.result;
+}
+
+function hasRevertSelector(value: unknown, selector: string): boolean {
+	if (typeof value === 'string') return value.toLowerCase().includes(selector.toLowerCase());
+	if (!value || typeof value !== 'object') return false;
+	return Object.values(value).some((entry) => hasRevertSelector(entry, selector));
 }
 
 async function callArc(to: Address, data: Hex) {
@@ -309,12 +332,23 @@ export async function ensureEscrowShipment(input: {
 		functionName: 'getShipment',
 		args: [chainShipmentId]
 	});
-	const result = decodeFunctionResult({
-		abi: escrowAbi,
-		functionName: 'getShipment',
-		data: await callArc(escrowAddress, data)
-	});
-	if (result[4]) {
+	let result: ReturnType<typeof decodeFunctionResult<typeof escrowAbi, 'getShipment'>> | null =
+		null;
+	try {
+		result = decodeFunctionResult({
+			abi: escrowAbi,
+			functionName: 'getShipment',
+			data: await callArc(escrowAddress, data)
+		});
+	} catch (error) {
+		if (
+			!(error instanceof ArcRpcError) ||
+			!hasRevertSelector(error.data, shipmentNotFoundErrorSelector)
+		) {
+			throw error;
+		}
+	}
+	if (result?.[4]) {
 		if (
 			result[0].toLowerCase() !== input.shipper.toLowerCase() ||
 			result[1].toLowerCase() !== input.forwarder.toLowerCase()
