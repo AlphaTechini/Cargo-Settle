@@ -50,13 +50,18 @@ async function verifyShipmentParties(
 	tx: Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0],
 	input: CreateShipmentInput
 ) {
+	const participantIds = input.participants?.map((participant) => participant.userId) ?? [];
 	const members = await tx
 		.select({ userId: workspaceMembers.userId, businessRole: workspaceMembers.businessRole })
 		.from(workspaceMembers)
 		.where(
 			and(
 				eq(workspaceMembers.workspaceId, input.workspaceId),
-				inArray(workspaceMembers.userId, [input.shipperId, input.freightForwarderId])
+				inArray(workspaceMembers.userId, [
+					input.shipperId,
+					input.freightForwarderId,
+					...participantIds
+				])
 			)
 		);
 	const roles = new Map(members.map((member) => [member.userId, member.businessRole]));
@@ -68,6 +73,14 @@ async function verifyShipmentParties(
 			'freightForwarderId must be an active forwarder workspace member',
 			400
 		);
+	}
+	for (const participantId of participantIds) {
+		if (roles.get(participantId) !== 'logistics_partner') {
+			throw new ShipmentServiceError(
+				'participants must be active logistics partner workspace members',
+				400
+			);
+		}
 	}
 }
 
@@ -108,6 +121,15 @@ export async function createShipment(context: WorkspaceContext, input: CreateShi
 				evidenceRequired: milestone.evidenceRequired ?? false
 			}))
 		);
+		if (input.participants?.length) {
+			await tx.insert(shipmentParticipants).values(
+				input.participants.map((participant) => ({
+					shipmentId: shipment.id,
+					logisticsPartnerId: participant.userId,
+					serviceType: participant.serviceType
+				}))
+			);
+		}
 		if (input.funding) {
 			await tx.insert(fundingIntents).values({
 				workspaceId: input.workspaceId,
@@ -147,6 +169,19 @@ export async function createShipment(context: WorkspaceContext, input: CreateShi
 			entityId: shipment.id
 		}
 	]);
+	if (input.participants?.length) {
+		await createNotifications(
+			input.participants.map((participant) => ({
+				workspaceId: context.workspace.id,
+				userId: participant.userId,
+				type: 'system' as const,
+				title: 'Shipment assignment',
+				body: `${shipment.reference} assigned you as a logistics partner for ${participant.serviceType}.`,
+				entityType: 'shipment',
+				entityId: shipment.id
+			}))
+		);
+	}
 	return shipment;
 }
 

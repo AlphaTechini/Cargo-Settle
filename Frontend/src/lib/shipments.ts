@@ -72,6 +72,10 @@ export type CreateShipmentRequest = {
 		amount: string;
 		currency: SettlementCurrency;
 	};
+	participants?: Array<{
+		userId: string;
+		serviceType: string;
+	}>;
 	milestones: Array<{
 		key: string;
 		label: string;

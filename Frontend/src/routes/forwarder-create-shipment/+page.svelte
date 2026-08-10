@@ -24,6 +24,8 @@
 	let notes = $state('');
 	let fundingAmount = $state('');
 	let fundingCurrency = $state<SettlementCurrency>('usdc');
+	let partnerId = $state('');
+	let partnerServiceType = $state('Freight coordination');
 	let members = $state<WorkspaceMember[]>([]);
 	let createdShipmentId = $state('');
 	let loadedWorkspaceId = $state('');
@@ -31,6 +33,11 @@
 	let workspaceId = $derived(page.data.activeWorkspace?.id ?? '');
 	let currentUserId = $derived(page.data.user?.id ?? '');
 	let shippers = $derived(members.filter((member) => member.businessRole === 'shipper'));
+	let logisticsPartners = $derived(
+		members.filter(
+			(member) => member.businessRole === 'logistics_partner' && member.userId !== currentUserId
+		)
+	);
 	const steps = ['Shipment details', 'Partners', 'Funding'];
 
 	$effect(() => {
@@ -42,7 +49,8 @@
 	async function loadMembers() {
 		try {
 			members = (await getWorkspaceMembers(workspaceId)).members;
-			clientId = members.find((member) => member.businessRole === 'shipper')?.userId ?? '';
+			if (!clientId)
+				clientId = members.find((member) => member.businessRole === 'shipper')?.userId ?? '';
 		} catch (requestError) {
 			error =
 				requestError instanceof Error ? requestError.message : 'Unable to load workspace members';
@@ -81,6 +89,9 @@
 				notes: notes || null,
 				...(requestFunding
 					? { funding: { amount: fundingAmount.trim(), currency: fundingCurrency } }
+					: {}),
+				...(partnerId
+					? { participants: [{ userId: partnerId, serviceType: partnerServiceType.trim() }] }
 					: {}),
 				milestones: [
 					{ key: 'departure', label: 'Departure', sequence: 1 },
@@ -217,35 +228,43 @@
 				{:else if step === 2}
 					<h2 class="text-xl font-extrabold">Assign partners</h2>
 					<p class="cs-muted mt-1 text-sm">
-						Milestones are created with the shipment. Partner assignments can be added after
-						creation.
+						Choose an active logistics partner to assign operational responsibility for this
+						shipment.
 					</p>
-					<div class="mt-7 space-y-3">
-						<div class="cs-card-sm flex items-center gap-4 p-4">
-							<span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700"
-								><Icon name="ship" /></span
+					<div class="mt-7 grid gap-5 md:grid-cols-2">
+						<div>
+							<label class="cs-label" for="partner">Logistics partner</label><select
+								id="partner"
+								class="cs-input"
+								bind:value={partnerId}
+								><option value="">No partner assigned yet</option
+								>{#each logisticsPartners as partner (partner.userId)}<option value={partner.userId}
+										>{partner.displayName} · {partner.email}</option
+									>{/each}</select
 							>
-							<span class="flex-1"
-								><b>Departure</b><small class="cs-muted block text-xs"
-									>Shipment milestone · Pending</small
-								></span
-							>
+							{#if logisticsPartners.length === 0}
+								<p class="cs-muted mt-2 text-xs">
+									No accepted logistics partners are in this workspace yet.
+								</p>
+							{/if}
 						</div>
-						<div class="cs-card-sm flex items-center gap-4 p-4">
-							<span
-								class="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-700"
-								><Icon name="building" /></span
-							>
-							<span class="flex-1"
-								><b>Final delivery</b><small class="cs-muted block text-xs"
-									>Evidence required · Pending</small
-								></span
-							>
+						<div>
+							<label class="cs-label" for="service-type">Service type</label><input
+								id="service-type"
+								class="cs-input"
+								bind:value={partnerServiceType}
+								disabled={!partnerId}
+								placeholder="Freight coordination"
+							/>
 						</div>
 					</div>
-					<a class="mt-5 inline-flex font-bold text-teal-700" href="/forwarder-partner-directory"
-						>Browse partner network <Icon name="arrow-right" size={16} /></a
-					>
+					<div class="cs-card-sm mt-6 flex items-start gap-3 p-4">
+						<span class="text-teal-700"><Icon name="route" size={18} /></span>
+						<p class="cs-muted text-sm">
+							{members.length} active workspace member{members.length === 1 ? '' : 's'} loaded. The shipper
+							and partner selectors only show members with the matching role.
+						</p>
+					</div>
 				{:else}
 					<h2 class="text-xl font-extrabold">Review and create</h2>
 					<p class="cs-muted mt-1 text-sm">

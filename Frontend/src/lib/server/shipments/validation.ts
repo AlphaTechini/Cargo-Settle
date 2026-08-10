@@ -88,6 +88,29 @@ export function parseCreateShipmentInput(value: unknown): CreateShipmentInput {
 	const freightForwarderId = requiredString(body.freightForwarderId, 'freightForwarderId');
 	if (shipperId === freightForwarderId)
 		throw new ShipmentInputError('Shipper and forwarder must be different users');
+	const rawParticipants = body.participants === undefined ? [] : body.participants;
+	if (!Array.isArray(rawParticipants))
+		throw new ShipmentInputError('participants must be an array');
+	const participants = rawParticipants.map((raw, index) => {
+		if (!raw || typeof raw !== 'object') {
+			throw new ShipmentInputError(`participants[${index}] is invalid`);
+		}
+		const participant = raw as Record<string, unknown>;
+		return {
+			userId: requiredString(participant.userId, `participants[${index}].userId`),
+			serviceType: requiredString(participant.serviceType, `participants[${index}].serviceType`)
+		};
+	});
+	if (new Set(participants.map((participant) => participant.userId)).size !== participants.length) {
+		throw new ShipmentInputError('Each logistics partner can only be assigned once');
+	}
+	if (
+		participants.some(
+			(participant) => participant.userId === shipperId || participant.userId === freightForwarderId
+		)
+	) {
+		throw new ShipmentInputError('Shipment parties cannot also be logistics partners');
+	}
 
 	return {
 		workspaceId: requiredString(body.workspaceId, 'workspaceId'),
@@ -102,6 +125,7 @@ export function parseCreateShipmentInput(value: unknown): CreateShipmentInput {
 		estimatedArrival: optionalDate(body.estimatedArrival, 'estimatedArrival'),
 		notes: optionalString(body.notes),
 		funding: body.funding === undefined ? undefined : parseFundingRequest(body.funding),
+		participants,
 		milestones
 	};
 }

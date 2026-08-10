@@ -26,6 +26,10 @@ export type CreateShipmentInput = {
 	estimatedArrival?: Date | null;
 	notes?: string | null;
 	funding?: FundingRequestInput;
+	participants?: Array<{
+		userId: string;
+		serviceType: string;
+	}>;
 	milestones: ShipmentMilestoneInput[];
 };
 
