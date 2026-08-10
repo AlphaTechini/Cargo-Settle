@@ -169,51 +169,53 @@
 >
 	<div class="flex h-full flex-col px-4 py-5">
 		<div class="mb-7 px-2"><Logo /></div>
-		<div class="relative mb-5 px-2">
-			<button
-				class="cs-card-sm flex w-full items-center justify-between p-3 text-left"
-				onclick={() => (workspaceOpen = !workspaceOpen)}
-			>
-				<span
-					><span class="cs-muted block text-[.68rem] font-bold tracking-wider uppercase"
-						>{details.workspaceLabel}</span
-					><span class="mt-1 block text-sm font-bold">{workspaceName}</span></span
+		<div class="min-h-0 flex-1 overflow-y-auto pr-1">
+			<div class="relative mb-5 px-2">
+				<button
+					class="cs-card-sm flex w-full items-center justify-between p-3 text-left"
+					onclick={() => (workspaceOpen = !workspaceOpen)}
 				>
-				<Icon name="chevrons-up-down" size={16} className="cs-muted" />
-			</button>
-			{#if workspaceOpen}
-				<div class="cs-card cs-shadow absolute top-full right-2 left-2 z-40 mt-2 p-2 text-sm">
-					{#each page.data.workspaces ?? [] as workspace (workspace.id)}
-						<button
-							class={`w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${workspace.id === activeWorkspace?.id ? 'bg-teal-50 font-bold text-teal-700' : ''}`}
-							onclick={() => selectWorkspace(workspace.id)}>{workspace.name}</button
+					<span
+						><span class="cs-muted block text-[.68rem] font-bold tracking-wider uppercase"
+							>{details.workspaceLabel}</span
+						><span class="mt-1 block text-sm font-bold">{workspaceName}</span></span
+					>
+					<Icon name="chevrons-up-down" size={16} className="cs-muted" />
+				</button>
+				{#if workspaceOpen}
+					<div class="cs-card cs-shadow absolute top-full right-2 left-2 z-40 mt-2 p-2 text-sm">
+						{#each page.data.workspaces ?? [] as workspace (workspace.id)}
+							<button
+								class={`w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${workspace.id === activeWorkspace?.id ? 'bg-teal-50 font-bold text-teal-700' : ''}`}
+								onclick={() => selectWorkspace(workspace.id)}>{workspace.name}</button
+							>
+						{/each}
+						<a
+							href="/settings"
+							class="mt-1 block rounded-lg px-3 py-2 text-teal-700 hover:bg-slate-50"
+							>Manage workspace</a
 						>
-					{/each}
-					<a
-						href="/settings"
-						class="mt-1 block rounded-lg px-3 py-2 text-teal-700 hover:bg-slate-50"
-						>Manage workspace</a
+					</div>
+				{/if}
+			</div>
+			<nav class="space-y-1" aria-label="Primary navigation">
+				{#each details.links as link (link[0])}
+					<a href={link[3]} class:active={active === link[0]} class="cs-sidebar-link"
+						><Icon name={link[2]} size={18} /><span>{link[1]}</span></a
+					>
+				{/each}
+			</nav>
+			{#if role === 'forwarder'}
+				<div class="cs-divider mt-6 border-t pt-5">
+					<a href="/forwarder-reports" class="cs-sidebar-link"
+						><Icon name="bar-chart" size={18} /><span>Reports</span></a
+					><a href="/settings" class="cs-sidebar-link"
+						><Icon name="settings" size={18} /><span>Settings</span></a
 					>
 				</div>
 			{/if}
 		</div>
-		<nav class="space-y-1" aria-label="Primary navigation">
-			{#each details.links as link (link[0])}
-				<a href={link[3]} class:active={active === link[0]} class="cs-sidebar-link"
-					><Icon name={link[2]} size={18} /><span>{link[1]}</span></a
-				>
-			{/each}
-		</nav>
-		{#if role === 'forwarder'}
-			<div class="cs-divider mt-6 border-t pt-5">
-				<a href="/forwarder-reports" class="cs-sidebar-link"
-					><Icon name="bar-chart" size={18} /><span>Reports</span></a
-				><a href="/settings" class="cs-sidebar-link"
-					><Icon name="settings" size={18} /><span>Settings</span></a
-				>
-			</div>
-		{/if}
-		<div class="cs-card-sm relative mt-auto flex items-center gap-3 p-3">
+		<div class="cs-card-sm relative mt-4 flex shrink-0 items-center gap-3 p-3">
 			<div class="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-sm font-extrabold">
 				{profileInitials}
 			</div>
