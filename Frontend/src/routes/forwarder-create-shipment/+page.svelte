@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { createShipment, getWorkspaceMembers, type WorkspaceMember } from '$lib/shipments';
+	import {
+		createShipment,
+		getWorkspaceMembers,
+		type SettlementCurrency,
+		type WorkspaceMember
+	} from '$lib/shipments';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -17,9 +22,12 @@
 	let estimatedDeparture = $state('');
 	let estimatedArrival = $state('');
 	let notes = $state('');
+	let fundingAmount = $state('');
+	let fundingCurrency = $state<SettlementCurrency>('usdc');
 	let members = $state<WorkspaceMember[]>([]);
 	let createdShipmentId = $state('');
 	let loadedWorkspaceId = $state('');
+	let fundingRequested = $state(false);
 	let workspaceId = $derived(page.data.activeWorkspace?.id ?? '');
 	let currentUserId = $derived(page.data.user?.id ?? '');
 	let shippers = $derived(members.filter((member) => member.businessRole === 'shipper'));
@@ -49,10 +57,14 @@
 		return '';
 	}
 
-	async function submitShipment() {
+	async function submitShipment(requestFunding = false) {
 		if (saved) return;
 		error = validateDetails();
 		if (error) return;
+		if (requestFunding && (!fundingAmount.trim() || Number(fundingAmount) <= 0)) {
+			error = 'Enter a funding amount greater than zero.';
+			return;
+		}
 		submitting = true;
 		try {
 			const result = await createShipment({
@@ -67,12 +79,16 @@
 				estimatedDeparture: estimatedDeparture || null,
 				estimatedArrival: estimatedArrival || null,
 				notes: notes || null,
+				...(requestFunding
+					? { funding: { amount: fundingAmount.trim(), currency: fundingCurrency } }
+					: {}),
 				milestones: [
 					{ key: 'departure', label: 'Departure', sequence: 1 },
 					{ key: 'delivery', label: 'Final delivery', sequence: 2, evidenceRequired: true }
 				]
 			});
 			createdShipmentId = result.shipment.id;
+			fundingRequested = requestFunding;
 			saved = true;
 		} catch (requestError) {
 			error = requestError instanceof Error ? requestError.message : 'Unable to create shipment';
@@ -87,7 +103,7 @@
 			if (error) return;
 		}
 		if (step < 3) step += 1;
-		else await submitShipment();
+		else await submitShipment(true);
 	}
 </script>
 
@@ -233,7 +249,7 @@
 				{:else}
 					<h2 class="text-xl font-extrabold">Review and create</h2>
 					<p class="cs-muted mt-1 text-sm">
-						Confirm the shipment record before creating it in the active workspace.
+						Confirm the shipment and funding request before creating them in the active workspace.
 					</p>
 					<div class="mt-7 grid gap-4 md:grid-cols-3">
 						<div class="rounded-xl bg-slate-50 p-4">
@@ -246,7 +262,26 @@
 						</div>
 						<div class="rounded-xl bg-slate-50 p-4">
 							<p class="cs-muted text-xs">Funding setup</p>
-							<p class="mt-1 font-extrabold">After creation</p>
+							<div class="mt-2 flex gap-2">
+								<input
+									class="cs-input"
+									aria-label="Funding amount"
+									inputmode="decimal"
+									min="0"
+									placeholder="Amount"
+									step="0.000001"
+									type="number"
+									bind:value={fundingAmount}
+								/>
+								<select
+									class="cs-input max-w-28"
+									aria-label="Funding currency"
+									bind:value={fundingCurrency}
+								>
+									<option value="usdc">USDC</option>
+									<option value="eurc">EURC</option>
+								</select>
+							</div>
 						</div>
 					</div>
 					{#if saved}
@@ -254,6 +289,8 @@
 							<b>Shipment {reference || 'record'} created.</b>
 							<p class="mt-1">
 								The record and its milestones are now stored in the active workspace.
+								{#if fundingRequested}
+									The {fundingCurrency.toUpperCase()} funding request was sent to the shipper.{/if}
 							</p>
 							{#if createdShipmentId}<a
 									class="mt-3 inline-flex font-bold text-teal-800 underline"
@@ -276,7 +313,8 @@
 						<button
 							class="cs-btn cs-btn-secondary"
 							disabled={submitting || saved}
-							onclick={submitShipment}>{submitting ? 'Saving...' : 'Save draft'}</button
+							onclick={() => void submitShipment()}
+							>{submitting ? 'Saving...' : 'Save draft'}</button
 						><button
 							class="cs-btn cs-btn-primary"
 							disabled={submitting || (step === 3 && saved)}

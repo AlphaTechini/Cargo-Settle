@@ -68,6 +68,10 @@ export type CreateShipmentRequest = {
 	estimatedDeparture?: string | null;
 	estimatedArrival?: string | null;
 	notes?: string | null;
+	funding?: {
+		amount: string;
+		currency: SettlementCurrency;
+	};
 	milestones: Array<{
 		key: string;
 		label: string;

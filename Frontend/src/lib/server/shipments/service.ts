@@ -10,6 +10,7 @@ import {
 	shipmentDocuments,
 	shipmentParticipants,
 	shipments,
+	fundingIntents,
 	workspaceMembers
 } from '$lib/server/db/schema';
 import type {
@@ -107,6 +108,16 @@ export async function createShipment(context: WorkspaceContext, input: CreateShi
 				evidenceRequired: milestone.evidenceRequired ?? false
 			}))
 		);
+		if (input.funding) {
+			await tx.insert(fundingIntents).values({
+				workspaceId: input.workspaceId,
+				shipmentId: shipment.id,
+				requestedBy: context.user.id,
+				amount: input.funding.amount,
+				currency: input.funding.currency,
+				idempotencyKey: `initial-funding:${shipment.id}`
+			});
+		}
 		await tx.insert(auditEvents).values({
 			workspaceId: context.workspace.id,
 			actorId: context.user.id,

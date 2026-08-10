@@ -1,4 +1,5 @@
 import type { BusinessRole } from '$lib/server/auth/types';
+import type { FundingRequestInput } from '$lib/server/funding/validation';
 
 export type ShipmentStatus = 'draft' | 'funded' | 'in_transit' | 'completed' | 'cancelled';
 export type MilestoneStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
@@ -24,6 +25,7 @@ export type CreateShipmentInput = {
 	estimatedDeparture?: Date | null;
 	estimatedArrival?: Date | null;
 	notes?: string | null;
+	funding?: FundingRequestInput;
 	milestones: ShipmentMilestoneInput[];
 };
 

@@ -4,6 +4,7 @@ import type {
 	ShipmentStatus,
 	UpdateShipmentInput
 } from './types';
+import { parseFundingRequest } from '$lib/server/funding/validation';
 
 export class ShipmentInputError extends Error {
 	status = 400;
@@ -100,6 +101,7 @@ export function parseCreateShipmentInput(value: unknown): CreateShipmentInput {
 		estimatedDeparture: optionalDate(body.estimatedDeparture, 'estimatedDeparture'),
 		estimatedArrival: optionalDate(body.estimatedArrival, 'estimatedArrival'),
 		notes: optionalString(body.notes),
+		funding: body.funding === undefined ? undefined : parseFundingRequest(body.funding),
 		milestones
 	};
 }
