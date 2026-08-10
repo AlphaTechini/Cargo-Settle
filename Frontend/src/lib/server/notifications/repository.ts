@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { notifications, workspaceInvitations, workspaces } from '$lib/server/db/schema';
 
@@ -121,4 +121,11 @@ export async function markNotificationRead(userId: string, notificationId: strin
 		.update(notifications)
 		.set({ readAt: new Date() })
 		.where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+}
+
+export async function markAllNotificationsRead(userId: string) {
+	await getDb()
+		.update(notifications)
+		.set({ readAt: new Date() })
+		.where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
 }

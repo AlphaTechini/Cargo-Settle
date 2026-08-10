@@ -8,7 +8,7 @@ import {
 	workspaceMembers,
 	workspaces
 } from '$lib/server/db/schema';
-import { listUserNotifications } from './repository';
+import { listUserNotifications, markAllNotificationsRead } from './repository';
 
 export type NotificationInput = {
 	workspaceId: string;
@@ -29,7 +29,7 @@ export class NotificationServiceError extends Error {
 	}
 }
 
-export { listUserNotifications };
+export { listUserNotifications, markAllNotificationsRead };
 
 export async function createNotifications(inputs: NotificationInput[]) {
 	if (inputs.length === 0) return;

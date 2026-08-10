@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { AuthorizationError, requireUser } from '$lib/server/auth/authorization';
-import { listUserNotifications } from '$lib/server/notifications/service';
+import { listUserNotifications, markAllNotificationsRead } from '$lib/server/notifications/service';
 import { listUserWorkspaces } from '$lib/server/workspaces';
 
 function shellRole(role: string | undefined) {
@@ -13,6 +13,7 @@ function shellRole(role: string | undefined) {
 export const load: PageServerLoad = async (event) => {
 	try {
 		const user = requireUser(event);
+		await markAllNotificationsRead(user.id);
 		const [notifications, workspaces] = await Promise.all([
 			listUserNotifications(user.id, user.email),
 			listUserWorkspaces(user.id)

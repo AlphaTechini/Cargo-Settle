@@ -129,6 +129,21 @@
 		}
 	}
 
+	async function markNotificationsRead() {
+		const response = await fetch('/api/notifications', { method: 'POST' });
+		if (response.ok) {
+			const readAt = new Date().toISOString();
+			notifications = notifications.map((notification) => ({ ...notification, readAt }));
+		}
+	}
+
+	async function toggleNotifications() {
+		notificationsOpen = !notificationsOpen;
+		if (!notificationsOpen || !currentUser) return;
+		await loadNotifications();
+		await markNotificationsRead();
+	}
+
 	async function acceptNotification(notification: NotificationItem) {
 		const response = await fetch(`/api/notifications/${notification.id}/accept`, {
 			method: 'POST'
@@ -262,7 +277,7 @@
 						<button
 							class="cs-btn cs-btn-secondary relative !px-3"
 							aria-label="Toggle notifications"
-							onclick={() => (notificationsOpen = !notificationsOpen)}
+							onclick={() => void toggleNotifications()}
 							><Icon name="bell" size={16} />{#if unreadNotificationCount > 0}<span
 									class="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[.6rem] text-white"
 									>{unreadNotificationCount}</span
