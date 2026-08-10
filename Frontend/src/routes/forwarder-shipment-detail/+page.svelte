@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import DemoModal from '$lib/components/DemoModal.svelte';
@@ -11,11 +12,14 @@
 		formatFundedAmount,
 		getShipment,
 		getWorkspaceMembers,
+		deleteShipment,
 		milestoneStatusLabel,
 		milestoneStatusTone,
+		requestShipmentFunding,
 		shipmentStatusLabel,
 		shipmentStatusTone,
 		updateMilestone,
+		type SettlementCurrency,
 		type ShipmentDetail,
 		type WorkspaceMember
 	} from '$lib/shipments';
@@ -23,7 +27,9 @@
 	type SelectedFile = { name: string; type: string; size: number };
 
 	let tab = $state('Overview');
-	let modal = $state<'upload' | 'message' | 'bill' | 'customs' | 'fx' | null>(null);
+	let modal = $state<
+		'upload' | 'message' | 'bill' | 'customs' | 'fx' | 'funding' | 'delete' | null
+	>(null);
 	let shipment = $state<ShipmentDetail | null>(null);
 	let members = $state<WorkspaceMember[]>([]);
 	let documentName = $state('');
@@ -34,6 +40,9 @@
 	let fxAmount = $state('8500');
 	let fxQuoted = $state(false);
 	let fxApplied = $state(false);
+	let fundingAmount = $state('');
+	let fundingCurrency = $state<SettlementCurrency>('usdc');
+	let actionNotice = $state('');
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state('');
@@ -118,7 +127,36 @@
 	}
 
 	async function confirmModal() {
-		if (modal === 'upload') {
+		if (modal === 'funding') {
+			const amount = String(fundingAmount).trim();
+			if (!shipment || !amount || Number(amount) <= 0) {
+				error = 'Enter a funding amount greater than zero.';
+				return;
+			}
+			saving = true;
+			error = '';
+			try {
+				await requestShipmentFunding(shipment.id, { amount, currency: fundingCurrency });
+				modal = null;
+				actionNotice = `Funding request sent to ${memberName(shipment.shipperId)}.`;
+			} catch (requestError) {
+				error = requestError instanceof Error ? requestError.message : 'Unable to request funding';
+			} finally {
+				saving = false;
+			}
+		} else if (modal === 'delete') {
+			if (!shipment) return;
+			saving = true;
+			error = '';
+			try {
+				await deleteShipment(shipment.id);
+				await goto('/forwarder-shipments');
+			} catch (requestError) {
+				error = requestError instanceof Error ? requestError.message : 'Unable to delete draft';
+			} finally {
+				saving = false;
+			}
+		} else if (modal === 'upload') {
 			if (!shipment || !selectedFile) {
 				error = 'Choose a document before attaching it.';
 				return;
@@ -160,6 +198,9 @@
 >
 	<section class="mx-auto max-w-[1600px] p-5 lg:p-8">
 		{#if error}<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-900">{error}</div>{/if}
+		{#if actionNotice}<div class="mb-5 rounded-xl bg-teal-50 p-4 text-sm text-teal-900">
+				{actionNotice}
+			</div>{/if}
 		{#if loading}
 			<div class="cs-card cs-muted p-8 text-center">Loading shipment...</div>
 		{:else if shipment}
@@ -182,6 +223,19 @@
 						</p>
 					</div>
 					<div class="flex flex-wrap gap-2">
+						{#if shipment.status === 'draft'}
+							<button
+								class="cs-btn cs-btn-secondary"
+								disabled={saving}
+								onclick={() => (modal = 'funding')}
+								><Icon name="wallet" size={16} />Request funding</button
+							>
+							<button
+								class="cs-btn cs-btn-secondary text-red-700"
+								disabled={saving}
+								onclick={() => (modal = 'delete')}>Delete draft</button
+							>
+						{/if}
 						<button
 							class="cs-btn cs-btn-secondary"
 							disabled={saving}
@@ -435,14 +489,22 @@
 				? 'Bill of lading preview'
 				: modal === 'customs'
 					? 'Customs release preview'
-					: 'Review FX conversion'}
+					: modal === 'funding'
+						? 'Request shipment funding'
+						: modal === 'delete'
+							? 'Delete draft shipment'
+							: 'Review FX conversion'}
 	description={modal === 'upload'
 		? 'Attach evidence metadata to the shipment record.'
 		: modal === 'message'
 			? 'Prepare an operational update for shipment participants.'
 			: modal === 'fx'
 				? 'Review the local quote before reserving EURC.'
-				: 'Review the document attached to this shipment.'}
+				: modal === 'funding'
+					? 'Create a funding request for the shipper without recreating this shipment.'
+					: modal === 'delete'
+						? 'This permanently removes the draft and its draft-only records.'
+						: 'Review the document attached to this shipment.'}
 	confirmLabel={modal === 'upload'
 		? 'Attach document'
 		: modal === 'message'
@@ -451,7 +513,11 @@
 				? fxQuoted
 					? 'Apply quote'
 					: 'Get quote'
-				: 'Close preview'}
+				: modal === 'funding'
+					? 'Send funding request'
+					: modal === 'delete'
+						? 'Delete draft'
+						: 'Close preview'}
 	showConfirm={modal === 'bill' || modal === 'customs' ? false : true}
 	onClose={() => (modal = null)}
 	onConfirm={confirmModal}
@@ -500,6 +566,36 @@
 				<b>Quote ready</b>
 				<p class="mt-1">8,500 USDC -> EURC {fxAmount} · expires in 04:31.</p>
 			</div>{/if}
+	{:else if modal === 'funding'}
+		<div class="grid gap-4 md:grid-cols-2">
+			<div>
+				<label class="cs-label" for="draft-funding-amount">Amount</label><input
+					id="draft-funding-amount"
+					class="cs-input"
+					inputmode="decimal"
+					min="0"
+					step="0.000001"
+					type="number"
+					bind:value={fundingAmount}
+				/>
+			</div>
+			<div>
+				<label class="cs-label" for="draft-funding-currency">Currency</label><select
+					id="draft-funding-currency"
+					class="cs-input"
+					bind:value={fundingCurrency}
+					><option value="usdc">USDC</option><option value="eurc">EURC</option></select
+				>
+			</div>
+		</div>
+	{:else if modal === 'delete'}
+		<div class="rounded-xl bg-red-50 p-4 text-sm text-red-900">
+			<b>Delete {shipment?.reference ?? 'this draft'}?</b>
+			<p class="mt-1">
+				Only draft shipments without funding, documents, obligations, settlement records, or Arc
+				registration can be deleted.
+			</p>
+		</div>
 	{:else if modal === 'bill'}
 		<div class="rounded-xl bg-slate-50 p-5">
 			<p class="cs-muted text-xs font-bold tracking-wider uppercase">Bill of lading preview</p>

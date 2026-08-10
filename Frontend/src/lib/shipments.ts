@@ -141,6 +141,26 @@ export async function createShipment(input: CreateShipmentRequest) {
 	});
 }
 
+export async function requestShipmentFunding(
+	shipmentId: string,
+	input: { amount: string; currency: SettlementCurrency }
+) {
+	return request<{ shipmentId: string; fundingRequested: boolean }>(
+		`/api/shipments/${encodeURIComponent(shipmentId)}/funding`,
+		{
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(input)
+		}
+	);
+}
+
+export async function deleteShipment(shipmentId: string) {
+	return request<{ deleted: boolean }>(`/api/shipments/${encodeURIComponent(shipmentId)}`, {
+		method: 'DELETE'
+	});
+}
+
 export async function updateMilestone(
 	shipmentId: string,
 	milestoneId: string,

@@ -6,11 +6,15 @@ import { getDb } from '$lib/server/db';
 import { createNotifications, notifyShipmentUsers } from '$lib/server/notifications/service';
 import {
 	auditEvents,
+	earlyPaymentRequests,
+	fundingIntents,
+	notifications,
+	paymentObligations,
 	shipmentMilestones,
 	shipmentDocuments,
 	shipmentParticipants,
 	shipments,
-	fundingIntents,
+	settlements,
 	workspaceMembers
 } from '$lib/server/db/schema';
 import type {
@@ -215,6 +219,122 @@ export async function updateShipment(
 		metadata: { fields: Object.keys(input) }
 	});
 	return shipment;
+}
+
+export async function deleteDraftShipment(context: WorkspaceContext, shipmentId: string) {
+	await getDb().transaction(async (tx) => {
+		const [shipment] = await tx
+			.select({ id: shipments.id, status: shipments.status })
+			.from(shipments)
+			.where(
+				and(
+					eq(shipments.id, shipmentId),
+					eq(shipments.workspaceId, context.workspace.id),
+					eq(shipments.freightForwarderId, context.user.id)
+				)
+			)
+			.limit(1);
+		if (!shipment) throw new ShipmentServiceError('Shipment not found', 404);
+		if (shipment.status !== 'draft') {
+			throw new ShipmentServiceError('Only draft shipments can be deleted', 409);
+		}
+
+		const [funding] = await tx
+			.select({ id: fundingIntents.id })
+			.from(fundingIntents)
+			.where(eq(fundingIntents.shipmentId, shipmentId))
+			.limit(1);
+		if (funding) {
+			throw new ShipmentServiceError('Remove the funding request before deleting this draft', 409);
+		}
+
+		const participantRows = await tx
+			.select({ id: shipmentParticipants.id })
+			.from(shipmentParticipants)
+			.where(eq(shipmentParticipants.shipmentId, shipmentId));
+		if (participantRows.length) {
+			const obligations = await tx
+				.select({ id: paymentObligations.id })
+				.from(paymentObligations)
+				.where(
+					inArray(
+						paymentObligations.shipmentParticipantId,
+						participantRows.map((row) => row.id)
+					)
+				)
+				.limit(1);
+			if (obligations.length) {
+				throw new ShipmentServiceError(
+					'This draft has payment obligations and cannot be deleted',
+					409
+				);
+			}
+		}
+
+		const [settlement] = await tx
+			.select({ id: settlements.id })
+			.from(settlements)
+			.where(eq(settlements.shipmentId, shipmentId))
+			.limit(1);
+		if (settlement) {
+			throw new ShipmentServiceError(
+				'This draft has settlement records and cannot be deleted',
+				409
+			);
+		}
+
+		if (participantRows.length) {
+			const [earlyPayment] = await tx
+				.select({ id: earlyPaymentRequests.id })
+				.from(earlyPaymentRequests)
+				.innerJoin(paymentObligations, eq(earlyPaymentRequests.obligationId, paymentObligations.id))
+				.where(
+					inArray(
+						paymentObligations.shipmentParticipantId,
+						participantRows.map((row) => row.id)
+					)
+				)
+				.limit(1);
+			if (earlyPayment) {
+				throw new ShipmentServiceError(
+					'This draft has early-payment records and cannot be deleted',
+					409
+				);
+			}
+		}
+
+		const [onchainAudit] = await tx
+			.select({ id: auditEvents.id })
+			.from(auditEvents)
+			.where(
+				and(
+					eq(auditEvents.entityType, 'shipment'),
+					eq(auditEvents.entityId, shipmentId),
+					eq(auditEvents.action, 'onchain_created')
+				)
+			)
+			.limit(1);
+		if (onchainAudit) {
+			throw new ShipmentServiceError('This draft is registered on Arc and cannot be deleted', 409);
+		}
+
+		const [document] = await tx
+			.select({ id: shipmentDocuments.id })
+			.from(shipmentDocuments)
+			.where(eq(shipmentDocuments.shipmentId, shipmentId))
+			.limit(1);
+		if (document) {
+			throw new ShipmentServiceError('This draft has documents and cannot be deleted', 409);
+		}
+
+		await tx
+			.delete(notifications)
+			.where(and(eq(notifications.entityType, 'shipment'), eq(notifications.entityId, shipmentId)));
+		await tx.delete(auditEvents).where(eq(auditEvents.entityId, shipmentId));
+		await tx.delete(shipmentParticipants).where(eq(shipmentParticipants.shipmentId, shipmentId));
+		await tx.delete(shipmentMilestones).where(eq(shipmentMilestones.shipmentId, shipmentId));
+		await tx.delete(shipments).where(eq(shipments.id, shipmentId));
+	});
 }
 
 const allowedTransitions: Record<ShipmentStatus, ShipmentStatus[]> = {

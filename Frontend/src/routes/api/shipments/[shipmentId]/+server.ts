@@ -6,7 +6,7 @@ import {
 	requireWorkspaceMember
 } from '$lib/server/auth/authorization';
 import { getShipment } from '$lib/server/shipments/repository';
-import { updateShipment } from '$lib/server/shipments/service';
+import { deleteDraftShipment, updateShipment } from '$lib/server/shipments/service';
 import { parseUpdateShipmentInput } from '$lib/server/shipments/validation';
 
 export const GET: RequestHandler = async (event) => {
@@ -42,6 +42,18 @@ export const PATCH: RequestHandler = async (event) => {
 				parseUpdateShipmentInput(await event.request.json())
 			)
 		});
+	} catch (error) {
+		return authErrorResponse(error);
+	}
+};
+
+export const DELETE: RequestHandler = async (event) => {
+	try {
+		const context = requireBusinessRole(await requireWorkspaceMember(event), ['freight_forwarder']);
+		const shipmentId = event.params.shipmentId;
+		if (!shipmentId) return json({ error: 'shipmentId is required' }, { status: 400 });
+		await deleteDraftShipment(context, shipmentId);
+		return json({ deleted: true });
 	} catch (error) {
 		return authErrorResponse(error);
 	}
