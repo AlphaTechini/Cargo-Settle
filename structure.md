@@ -24,6 +24,7 @@
 - Active database schema and relations: [Frontend/src/lib/server/db/schema.ts](file:///C:/Hackathons/Cargo%20Settle/Frontend/src/lib/server/db/schema.ts)
 - Domain requirements: [Project.md](file:///C:/Hackathons/Cargo%20Settle/Project.md) and [schema.md](file:///C:/Hackathons/Cargo%20Settle/schema.md)
 - Arc settlement contracts: [Contracts/README.md](file:///C:/Hackathons/Cargo%20Settle/Contracts/README.md)
+- Platform testing flow: [TESTING.md](file:///C:/Hackathons/Cargo%20Settle/TESTING.md)
 
 ## Folder Documentation
 
