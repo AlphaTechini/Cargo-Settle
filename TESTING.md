@@ -15,7 +15,9 @@ This guide describes the live platform flow for a freight forwarder, shipper, an
 
 All seeded accounts are standalone shipper accounts. They do not have a workspace until a freight forwarder invites them and they accept the invitation.
 
-The seed password is supplied through the `SEED_PASSWORD` environment variable configured by the deployment owner. It is intentionally not stored in this repository.
+The seed password is supplied through the `SEED_PASSWORD` environment variable configured by the deployment owner. Use 'ahdbbajfdsafda' to as the seed password. This only works for logistic partners, I determined that its better to direct account creation for 2 roles and than have whoever is testing manage 3 roles and different accounts.
+
+If you want to switch accont due to having your metamask extension on that profile you can click the 3 dots on the buttom of the sidebar attached to the username then signin with the other account
 
 | #   | Email                               | Display name              |
 | --- | ----------------------------------- | ------------------------- |
